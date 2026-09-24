@@ -238,3 +238,17 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 **Human corrections:** None — user reported the symptom.
 **Verification:** `npm run typecheck` — clean. `npm run lint` — clean. Server auto-restarted at 11:35:41 (tsx watch, after the source edits), which also re-read `.env`. **12 concurrent logins → 12 × 200** (1.19–6.58 s) — with the old pool of 9 the overflow would have waited and failed. Direct check via a throwaway tsx script: `P2024 → 503 SERVICE_UNAVAILABLE Retry-After=5`, `P1001 → 503`, `P2002 → 409`. `npm run test:unit` result recorded in the commit message.
 **Commit:** suggested — `fix(db): size the Prisma pool for a remote pooler; map transient DB errors to 503`
+
+## AI-012 — Slice 9: README and final verification pass (2026-09-24)
+**Prompt (summary):** User asked whether the application meets every demand in the brief; the audit found one gap — no README (deliverables 6, 7, 8). User: "yes, write the README now".
+**Generated:**
+- `README.md` — in the brief's required order: Prerequisites, Installation, Environment variables (all three env files, every variable explained, the pool parameters and the direct-vs-pooled test rule), Database setup (`migrate deploy`, `db seed`), Backend startup, Frontend startup, Test users (the five accounts with ids, reporting lines and scope), API documentation (Swagger, raw OpenAPI, Postman run order, endpoint table), Authorization test scenarios (the six mandatory rows tagged to the automated tests, ten extra rules, the 403-vs-404 rule, the identity rule), Tests, Project structure, Design notes, Known limitations (latency, no refresh tokens, two accepted audit findings, bundle size, free-text department).
+**Issues found:**
+- None in this slice. Every command in the README was checked against `package.json` scripts in both packages and every cited path against the filesystem before committing.
+**Human corrections:** None.
+**Verification:**
+- README: 10/10 cited npm scripts exist; 15/15 cited paths exist; `.env.example` carries the pool parameters the README describes; D-005 and D-016 exist in `DECISIONS.md`.
+- Backend: `npm run typecheck` clean; `npm run lint` clean; **`npm test` — 6 suites, 162 tests passed, 142 s** (46 unit + 116 integration; schema rebuilt from migrations and seeded first). Run with the user's earlier consent value for the `test`-schema reset — same disposable target, same command.
+- Frontend: `npm run build` clean; `npm run lint` clean, zero warnings.
+- Not done by Claude: running the Postman collection (requires the Postman app). The same six scenarios pass in Jest and were exercised through Swagger/the UI during earlier slices.
+**Commit:** suggested — `docs: README with setup, test users, API docs and authorization scenarios`

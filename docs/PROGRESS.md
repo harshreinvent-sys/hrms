@@ -82,15 +82,18 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] Verified in browser: admin create → EMP101 → deactivate; manager form locks 8 of 10 fields; employee redirected from /employees; 375px no overflow
   - [x] Commit — `0d8f1c9`
 - [x] **Post-frontend fix — login 500s under load** (AI-011): Prisma pool sized for the remote pooler (`connection_limit=15&pool_timeout=30`); transient DB errors → 503 + `Retry-After`; 12 error-handler unit tests; favicon
-- [ ] **Slice 9 — README + final verification pass**
+- [x] **Slice 9 — README + final verification pass**
+  - [x] `README.md` in the brief's section order; every command and path checked against the repo
+  - [x] Final gate: backend typecheck + lint + **`npm test` 162/162**; frontend build + lint clean
 
 ## Next
 
-1. Commit the pool fix (AI-011).
-2. **Slice 9 — README** in the spec's section order, then the final verification pass and `PROGRESS.md` close-out.
-3. User-side: run the Postman collection; the frontend is at `http://localhost:5173`, the API at `http://localhost:4000` (Swagger `/api/docs`).
+**All nine slices are complete.** Remaining items are the user's:
+1. Run `postman/HRMS.postman_collection.json` against the running API (folders 0 → 1 → 2).
+2. Push to `origin` (`git push -u origin main`) when ready — nothing has been pushed.
+
+Optional follow-ups, none required by the brief: code-split the frontend bundle; host the API near the database to remove the 2–7 s latency; refresh tokens.
 
 ## Blockers
 
-- None for the backend. For future `npm test` runs from Claude Code, Prisma's AI-agent guard requires the user's consent each time (`PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`); from the user's own terminal it does not fire.
-- **CodeGraph MCP tools** (`codegraph_explore`) register on session restart only. Until then, graph checks run via the `codegraph` CLI with `grep` as backstop.
+- None.
