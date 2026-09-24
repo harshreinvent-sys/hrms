@@ -23,13 +23,17 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] Migration `prisma/migrations/20260924072540_init/` generated **offline** (`prisma migrate diff`), sequence appended (D-004)
   - [x] Jest split into `unit` / `integration` projects (D-013); `test:unit`, `test:integration`, `prisma:deploy` scripts
   - [x] CRG other-agent files deleted (D-014); CodeGraph re-indexed (18 files)
-  - [ ] **BLOCKED — needs `backend/.env` + `.env.test`:** `npx prisma migrate deploy` (apply), `npx prisma db seed` (15/15), integration tests
+  - [x] `backend/.env` + `.env.test` exist (created from the user's credentials; template restored)
+  - [x] `npx prisma migrate deploy` — applied
+  - [x] `npx prisma db seed` — 16/16
+  - [x] Live scenario run against `public`: spec Tests 1,2,3,4,6 + extras all pass (AI-007)
+  - [x] **`npm test` — 150/150 passed** against the `test` schema, built from the migration files (AI-008)
   - [x] Commit — `491e917`
 - [x] **Slice 2 — Auth: login / logout + `authenticate` in use + OpenAPI bootstrap** — committed `8b9755e` (`/api/me` moved to Slice 3 — it is an employee read path)
   - [x] `modules/auth`: `POST /api/auth/login`, `POST /api/auth/logout`
   - [x] `routes.ts`, `app.ts` mounts `/api`, `/api/docs`, `/api/docs.json`
   - [x] `openapi.yaml` bootstrap (schemas, shared responses, auth paths)
-  - [x] `tests/helpers/{seedUsers,app}.ts`, `tests/integration/auth.test.ts` (17 tests) — **written, not run** (no `.env.test`)
+  - [x] `tests/helpers/{seedUsers,app}.ts`, `tests/integration/auth.test.ts` (17 tests) — **passing**
   - [x] `tsconfig.test.json`; `npm run typecheck` covers src + tests + prisma
   - [x] Verified: tsc (both configs), lint, DB-free smoke run, graph check
   - [x] Commit — `8b9755e`
@@ -38,7 +42,7 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] `tests/unit/employeePolicy.test.ts` — **34/34 passing** (no DB)
   - [x] `modules/employees` read paths: `GET /api/employees`, `GET /api/employees/:id`; `GET /api/me`
   - [x] `openapi.yaml`: Employee schemas + three paths
-  - [x] `tests/integration/authorization.test.ts` read half (30 tests) — **written, not run**
+  - [x] `tests/integration/authorization.test.ts` read half (30 tests) — **passing**
   - [x] `docs/AUTHORIZATION.md` matches the policy file
   - [x] Verified: typecheck, lint, unit tests, rule-3 grep, smoke, graph check
   - [x] Commit — `caa8eac`
@@ -47,17 +51,17 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] `PUT /api/employees/:id` — `findScoped` → `updatableFields` → 403 naming denied fields → explicit `data`; User mirror (D-015)
   - [x] `DELETE /api/employees/:id` — `canDelete`, soft delete both rows, self-deactivation 400
   - [x] `openapi.yaml` — write ops with per-role field table
-  - [x] `authorization.test.ts` write half (+27, all 6 spec tests now present), `employees.test.ts` (30) — **written, not run**
+  - [x] `authorization.test.ts` write half (+27, all 6 spec tests now present), `employees.test.ts` (30) — **passing**
   - [x] `docs/AUTHORIZATION.md`, D-015; seed count corrected to 16
   - [x] Verified: typecheck, lint, unit 34/34, rule-3 grep, smoke, graph check
   - [x] Commit — `0f06f35`
-- [ ] **Slice 5 — Dashboard stats + complete `openapi.yaml` + Postman collection**
+- [x] **Slice 5 — Dashboard stats + complete `openapi.yaml` + Postman collection** — committed `fcc39df`
   - [x] `GET /api/dashboard/stats` — every count/groupBy under `scopeWhere`
   - [x] `openapi.yaml` complete — 9 documented ops = 9 mounted routes (cross-checked)
   - [x] `postman/HRMS.postman_collection.json` — 21 requests, 6 mandatory scenarios with assertions
-  - [x] `tests/integration/dashboard.test.ts` (6) — **written, not run**
+  - [x] `tests/integration/dashboard.test.ts` (6) — **passing**
   - [x] Verified: typecheck, lint, unit 34/34, greps, route↔spec smoke, graph check
-  - [ ] Commit
+  - [x] Commit — `fcc39df`
 - [ ] **Slice 6 — Frontend scaffold + auth (Login, AuthContext, interceptors, ProtectedRoute, RoleGate)**
 - [ ] **Slice 7 — Dashboard + MyProfile pages**
 - [ ] **Slice 8 — EmployeeList / EmployeeDetail / EmployeeForm**
@@ -65,13 +69,13 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
 
 ## Next
 
-**Backend code is complete (Slices 0–5).** Two things remain before the frontend:
-1. The user creates `backend/.env` and `backend/.env.test` → run `npx prisma migrate deploy`, `npx prisma db seed`, then `npm test` (34 unit + 110 integration). Fix whatever the first real run surfaces; log it in AI-007.
-2. Start the API (`npm run dev`), open `http://localhost:4000/api/docs`, run the Postman collection.
+**Backend is complete and verified: 150/150 tests against Supabase; dev server running on :4000 with Swagger at `/api/docs`.**
 
-Then Slice 6 (frontend scaffold + auth).
+1. Commit the test-run fixes (AI-008).
+2. User-side: run `postman/HRMS.postman_collection.json` against the running server (Claude cannot drive Postman).
+3. Slice 6 — frontend scaffold + auth.
 
 ## Blockers
 
-- **Slice 1:** `backend/.env` and `backend/.env.test` do not exist. The user creates them from `backend/.env.example` / `.env.test.example` (Supabase pooled `:6543?pgbouncer=true` + direct `:5432` URLs, 32+ char `JWT_SECRET`). Secrets are not to be pasted into chat.
+- None for the backend. For future `npm test` runs from Claude Code, Prisma's AI-agent guard requires the user's consent each time (`PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`); from the user's own terminal it does not fire.
 - **CodeGraph MCP tools** (`codegraph_explore`) register on session restart only. Until then, graph checks run via the `codegraph` CLI with `grep` as backstop.

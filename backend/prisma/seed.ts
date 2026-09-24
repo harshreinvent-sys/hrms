@@ -143,7 +143,26 @@ const EMPLOYEES: SeedEmployee[] = [
   },
 ];
 
+/**
+ * Hosted Postgres occasionally refuses the first connection right after a
+ * schema reset (seen on Supabase when the test runner pushes then seeds within
+ * seconds). A few bounded retries keep `npm test` from failing on that alone.
+ */
+async function connectWithRetry(attempts = 5, delayMs = 2000): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await prisma.$connect();
+      return;
+    } catch (error) {
+      if (attempt >= attempts) throw error;
+      console.warn(`Database not reachable (attempt ${attempt}/${attempts}); retrying in ${delayMs}ms`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 async function main(): Promise<void> {
+  await connectWithRetry();
   const knownHash = await bcrypt.hash(SEED_PASSWORD, SALT_ROUNDS);
 
   for (const row of EMPLOYEES) {

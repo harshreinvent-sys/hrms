@@ -23,7 +23,7 @@ export interface LoginResult {
  * a compare against it so the response time does not reveal whether the account
  * exists (CLAUDE.md rule 9 covers the message; this covers the timing).
  */
-const DUMMY_HASH = '$2b$12$Rszk84Gdbqhxg3hLnZtRMOLnCvdQVU2f9RenZ8nI1FXcFzcj6B/9u';
+const HASH = '$2b$12$Rszk84Gdbqhxg3hLnZtRMOLnCvdQVU2f9RenZ8nI1FXcFzcj6B/9u';
 
 const INVALID = 'Invalid email or password';
 
@@ -42,7 +42,7 @@ export async function login(input: LoginInput): Promise<LoginResult> {
   });
 
   // Same message and roughly the same work for unknown email and wrong password.
-  const passwordMatches = await verifyPassword(input.password, user?.passwordHash ?? DUMMY_HASH);
+  const passwordMatches = await verifyPassword(input.password, user?.passwordHash ?? HASH);
   if (!user || !passwordMatches) {
     throw new UnauthorizedError(INVALID);
   }

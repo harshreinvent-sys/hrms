@@ -133,3 +133,48 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 **Human corrections:** None in this slice.
 **Verification:** `npm run typecheck` (both configs) — clean. `npm run lint` — clean. `npm run test:unit` — 34/34. Rule-3 greps outside the policy — none. All 3 module routers reference `authenticate`. DB-free smoke with a route↔spec cross-check: **9 documented operations = 9 mounted routes**, none missing, none extra; every operation except `POST /auth/login` declares `bearerAuth`; `GET /api/dashboard/stats` without a token → 401. `node -e` parse of the Postman JSON: 3 folders, 21 requests, 5 variables. `codegraph sync` (9 files) + `codegraph callers`: `authenticate` ← `auth.routes`, `dashboard.routes`, `employees.routes`, `routes.ts`; `scopeWhere` ← `dashboard.service`, `employees.service`. **Not run:** all four integration suites — `auth` (17), `authorization` (57), `employees` (30), `dashboard` (6) = **110 tests written, typechecked, linted, never executed**; the Postman collection has never been run against a live server. Both wait on `backend/.env` / `.env.test`.
 **Commit:** suggested — `feat(dashboard): scoped stats endpoint; complete OpenAPI; Postman collection`
+
+## AI-007 — First contact with the database: env files, migration, seed, live scenario run (2026-09-24)
+**Prompt (summary):** User asked "is backend fully working now". While checking, found that the user had pasted real Supabase URLs and a JWT secret into `backend/.env.example`.
+**Generated / changed:**
+- `backend/.env` — created by copying the user's edited template (no secret retyped by Claude).
+- `backend/.env.test` — derived from it: `NODE_ENV=test`, `PORT=4001`, `LOG_LEVEL=silent`, `schema=test` appended to both URLs.
+- `backend/.env.example` — restored to the committed template with `git checkout`. Verified `git status` clean and both real env files ignored.
+- No source changes.
+**Issues found:**
+- **Credentials in a tracked file.** `.env.example` is intentionally un-ignored (it is the template). The user's edit would have committed the database password on the next `git add`. Caught before any staging. Fixed as above. The secret values were visible to Claude through the file-change notification; they are not repeated anywhere in the repo or this log.
+- The two connection strings carried passwords that differed by one character. Both authenticated (migration over `DIRECT_URL`, seed and queries over `DATABASE_URL`), so whatever the difference is, it is not a defect — flagged to the user and left alone.
+- **Prisma's AI-agent guard blocked `npm test`.** `globalSetup` runs `npx prisma db push --force-reset --skip-generate --accept-data-loss` against `schema=test`; Prisma detected Claude Code and refused without explicit user consent (`PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`). Correct behaviour. Stopped and asked the user; did not work around it. Alternative offered: the user runs `npm test` from their own terminal, where no guard fires.
+- Observed request latency of 3–7 s per API call against the Supabase pooler from this machine (login includes a bcrypt compare; every authenticated request adds one indexed `User` lookup). Correctness unaffected; noted for the README as hosted-DB latency, not a code path to optimise in this MVP.
+- A first schema-existence probe failed with a Prisma validation error because the ad-hoc `node -e` script did not load `.env`; rerun with `-r dotenv/config`.
+**Human corrections:** The user supplied credentials (in the wrong file). No instruction changes.
+**Verification (all against the real Supabase project, `public` schema):**
+- `npx prisma migrate deploy` — `20260924072540_init` applied cleanly over `DIRECT_URL` (first time the offline-generated migration touched a database).
+- `npx prisma db seed` — "Seed complete: 16 employees, 16 users" over `DATABASE_URL` (first execution of the seed).
+- Live scenario run through `createApp()` + supertest with real logins: **Test 1 → 200, Test 2 → 403, Test 3 → 403, Test 4 → 200, Test 6 → 403** (Test 5 skipped deliberately — it writes to dev data; covered by the Jest suite). Extras: manager → direct report 200; employee1 → EMP999 403; admin → EMP999 404; employee1 `PUT { role: ADMIN }` → 403 with `details: [{ path: 'role' }]`; list scoping employee=`[EMP001]`, manager=`[EMP001, EMP002, EMP010]`, admin `total=16`; manager dashboard `{ total: 3, active: 3, inactive: 0, byDepartment: [Engineering: 3] }`; `/me` 200 / 401 without token.
+- `npm test` — **blocked at `globalSetup` by Prisma's consent guard; 0 tests ran.** The 34 unit tests were verified in earlier slices; the 110 integration tests remain unexecuted.
+**Commit:** none — no tracked files changed in this step.
+
+## AI-008 — First full test run against the database: 150/150 (2026-09-24)
+**Prompt (summary):** User: "run backend on localhost", then "yes, run the tests" (explicit consent for the destructive reset of the `test` schema, passed to Prisma as `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`).
+**Generated / changed:**
+- `.claude/launch.json` (project + session copy) — `npm --prefix backend run dev` on port 4000; server started through the desktop app's preview tool. Swagger UI confirmed rendering at `/api/docs`.
+- `backend/src/modules/auth/auth.service.ts` — the user renamed `DUMMY_HASH` → `HASH` but line 45 still referenced the old name; completed the rename (would have thrown `ReferenceError` → 500 on the first unknown-email login).
+- `backend/.env.test` — `DATABASE_URL` switched to the direct (5432) connection (D-016). `backend/.env.test.example` updated to match, with the reason.
+- `backend/src/config/env.ts` — `LOG_LEVEL` enum gains `silent` (pino accepts it; `.env.test` uses it).
+- `backend/prisma/seed.ts` — `connectWithRetry` (5 × 2 s) before the first query.
+- `backend/tests/setup/globalSetup.ts` — `db push --force-reset` → `migrate reset --force --skip-generate --skip-seed` (D-017).
+- `backend/src/modules/employees/employees.schemas.ts` — `dateOnly` now round-trips the parsed date; `2026-02-30` is rejected instead of rolling to March 2.
+- `backend/tests/integration/authorization.test.ts` — search assertion uses the unique surname.
+- `docs/DECISIONS.md` — D-016, D-017.
+**Issues found (in the order they surfaced, five runs to green):**
+1. **Prisma AI-agent guard** blocked `db push --force-reset`. Stopped, reported the exact command, what it destroys (schema `test`: 0 tables at the time; `public` untouched), dev-vs-prod, and asked. User consented. Correct outcome; not a bug.
+2. **Pooler + `schema=test` = "Can't reach database server".** Reset succeeded (uses `DIRECT_URL`), seed failed (uses `DATABASE_URL`). Isolated with three probes: pooled URL without `schema=` works, with it fails, direct with it works. Supabase's Supavisor rejects Prisma's `search_path` startup option. Fixed by D-016.
+3. **`LOG_LEVEL=silent` rejected by my own env schema** — all four integration suites failed at import. My template and my validator disagreed. Added `silent`.
+4. **Transient "Can't reach" on the direct host** seconds after the reset; 3/3 probes succeeded immediately after. Added bounded retry to the seed rather than to the tests, so `npx prisma db seed` benefits too.
+5. **28 failures, one root cause:** `relation "employee_id_seq" does not exist`. `db push` never runs migration SQL, so the sequence from D-004 was absent from `test` and every create returned 500 — including spec Test 5 and, by knock-on, the dashboard admin test that ran in the same window. This is the most significant finding of the day: the migration-vs-push mismatch would have shipped undetected if the suite had stayed unexecuted. Fixed by D-017, which also makes the tests exercise the real migration files.
+6. **Two genuine code/test bugs found by the run:** (a) `2026-02-30` passed date validation — JS rolls it over; refine now round-trips. (b) my search assertion `search=neha → [EMP001]` was wrong: the code correctly also matched S-**neha** Patel (EMP005). Test corrected; code unchanged.
+7. Observed timings: authorization suite 59–115 s, employees 54–77 s, full run 151–217 s — dominated by ~2–7 s round trips to Supabase and bcrypt cost 12. Not a code path to optimise for the MVP; noted for the README.
+**Human corrections:** User renamed `DUMMY_HASH` → `HASH` (completed by Claude). User granted the reset consent. No other redirection.
+**Verification:** `npm test` (with consent) — **Test Suites: 5 passed; Tests: 150 passed, 150 total; 151 s.** `globalSetup` output: "Applying migration 20260924072540_init … Database reset successful … Seed complete: 16 employees, 16 users." `npm run typecheck` (both configs) — clean. `npm run lint` — clean. Running dev server after hot-reload: `POST /api/employees` with `joiningDate: 2026-02-30` as admin → 400 (see the command output recorded alongside this entry). Earlier in the same step: `/health` 200, `/api/me` without token 401, `/api/docs.json` 200 (17 KB), Swagger UI screenshot, login employee1 200 with `expiresIn: 1800`, unknown email 401 through the renamed `HASH` path.
+**Commit:** suggested — `fix(tests): build test schema from migrations; direct DB for tests; date and search fixes`

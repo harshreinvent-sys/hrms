@@ -1,6 +1,6 @@
 # Decisions
 
-Format: context → decision → why → trade-off. Claude drafts; the human approves. Next id: **D-016**.
+Format: context → decision → why → trade-off. Claude drafts; the human approves. Next id: **D-018**.
 
 ## D-001 — Rebuild clean in `backend/`, drop out-of-spec modules
 **Context:** An API-only scaffold existed before the assessment brief arrived (flat `src/`, 4 roles, cuid IDs, attendance/leave/org, Vitest, inline authorization).
@@ -87,3 +87,15 @@ Format: context → decision → why → trade-off. Claude drafts; the human app
 **Decision:** In `update()`, an `email` change also updates `User.email`; a `status` change sets `User.isActive = (status === ACTIVE)`; a `role` change writes `User.role`. All in the same transaction as the employee update.
 **Why:** Otherwise renaming an employee's email leaves their login on the old address, and marking them INACTIVE leaves them able to sign in — the soft-delete path would then be the only one that got it right.
 **Trade-off:** Two tables carry the email. Accepted: the spec lists it on both entities, and the alternative (login by employee id) is worse UX.
+
+## D-016 — Tests connect directly (port 5432), not through the pooler
+**Context:** The first real `npm test` reset the `test` schema fine (that step uses `DIRECT_URL`) but the seed failed with "Can't reach database server at …pooler…:6543". The same pooled URL works without `schema=test`; the same URL with it does not.
+**Decision:** In `.env.test`, `DATABASE_URL` is the direct connection with `?schema=test` — identical to `DIRECT_URL`. The app's `.env` keeps the pooled URL.
+**Why:** Prisma implements `schema=` by sending a `search_path` startup option. Supabase's Supavisor pooler in transaction mode does not accept it and drops the connection, which Prisma surfaces as unreachable. A test run holds one connection at a time (`--runInBand`), so pooling buys nothing there.
+**Trade-off:** Tests and the app use different connection paths, so a pooler-specific problem in production would not show up in tests. Accepted for an MVP; the app path is exercised by the Postman collection and the frontend.
+
+## D-017 — Test schema is built with `migrate reset`, not `db push` (amends D-009)
+**Context:** The first full `npm test` failed every `POST /api/employees` path (28 tests, including spec Test 5) with a 500: `nextval('employee_id_seq')` — relation does not exist. `db push` syncs the Prisma models only; it never runs the hand-written `CREATE SEQUENCE` in the migration SQL (D-004).
+**Decision:** `globalSetup` runs `npx prisma migrate reset --force --skip-generate --skip-seed` against the `test` schema, then the seed.
+**Why:** The sequence exists only in migration SQL, so the test database must be built from the migrations. This also means the suite verifies the migration files a reviewer will apply, rather than a parallel schema that merely resembles them.
+**Trade-off:** `migrate reset` is a few seconds slower than `db push` and, like it, trips Prisma's AI-agent consent guard when run from an agent. Same consent variable covers both.

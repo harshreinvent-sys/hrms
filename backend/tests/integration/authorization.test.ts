@@ -196,7 +196,8 @@ describe('GET /api/employees', () => {
 
   it('admin: search matches id, name and email case-insensitively', async () => {
     const byId = await get('/api/employees?search=emp00', adminToken);
-    const byName = await get('/api/employees?search=neha', adminToken);
+    // 'neha' would also match S-neha Patel (EMP005); the surname is unique.
+    const byName = await get('/api/employees?search=kulkarni', adminToken);
     const byEmail = await get('/api/employees?search=EMPLOYEE2@', adminToken);
     expect(byId.body.pagination.total).toBeGreaterThanOrEqual(10);
     expect(byName.body.items.map((e: { id: string }) => e.id)).toEqual(['EMP001']);

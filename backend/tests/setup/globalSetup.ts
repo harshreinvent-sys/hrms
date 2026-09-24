@@ -1,10 +1,13 @@
 /**
  * Jest `globalSetup`: runs once per test run, in its own process, before any
- * test file. Resets the `test` schema to match schema.prisma and seeds it, so
- * every run starts from the documented seed state (D-009).
+ * test file. Rebuilds the `test` schema from the real migration files and seeds
+ * it, so every run starts from the documented seed state (D-009, D-017).
  *
- * Uses `db push` rather than `migrate deploy` because the test schema is
- * disposable; there is no migration history to preserve.
+ * `migrate reset` rather than `db push`: `db push` only syncs the Prisma models
+ * and skips hand-written migration SQL — the `employee_id_seq` sequence that
+ * `POST /api/employees` depends on would not exist, and every create would 500.
+ * Running the migrations also means the tests verify the deliverable a reviewer
+ * will actually apply.
  */
 import { execSync } from 'node:child_process';
 import path from 'node:path';
@@ -31,6 +34,6 @@ export default async function globalSetup(): Promise<void> {
     throw new Error('globalSetup: DIRECT_URL must target schema=test');
   }
 
-  run('npx prisma db push --force-reset --skip-generate --accept-data-loss');
+  run('npx prisma migrate reset --force --skip-generate --skip-seed');
   run('npx tsx prisma/seed.ts');
 }

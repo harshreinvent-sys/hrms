@@ -21,7 +21,12 @@ export type ListQuery = z.infer<typeof listQuerySchema>;
 const dateOnly = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a YYYY-MM-DD date')
-  .refine((value) => !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime()), 'Not a real date');
+  // JS silently rolls 2026-02-30 over to March 2; only a round-trip proves the
+  // calendar date is real.
+  .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  }, 'Not a real calendar date');
 
 const name = z.string().trim().min(1).max(80);
 const label = z.string().trim().min(1).max(100);

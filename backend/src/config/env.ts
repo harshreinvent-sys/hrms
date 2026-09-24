@@ -19,7 +19,8 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('30m'),
 
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+  // pino's levels, plus 'silent' (which pino accepts) so tests can mute logging.
+  LOG_LEVEL: z.enum(['silent', 'fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 
 const parsed = envSchema.safeParse(process.env);
