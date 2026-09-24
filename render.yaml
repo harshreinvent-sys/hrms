@@ -1,0 +1,53 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Two services from one repo. In the Render dashboard: New → Blueprint → pick this
+# repo. Render reads this file, creates both services, and prompts for the
+# variables marked `sync: false` (secrets never live in the repo).
+#
+# Order of operations on every backend deploy:
+#   build:  install (postinstall runs `prisma generate`) → compile to dist/
+#   start:  `prisma migrate deploy` (idempotent) → node dist/server.js
+#
+# The frontend is a static site; VITE_API_URL is baked in at build time, so set it
+# to the backend service's public URL + /api before the first frontend build.
+
+services:
+  - type: web
+    name: hrms-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run deploy
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: JWT_EXPIRES_IN
+        value: 30m
+      - key: DATABASE_URL
+        sync: false # Supabase pooled URL, port 6543, ...?pgbouncer=true&connection_limit=15&pool_timeout=30
+      - key: DIRECT_URL
+        sync: false # Supabase direct URL, port 5432
+      - key: JWT_SECRET
+        generateValue: true # Render generates a random 256-bit value
+      - key: CORS_ORIGIN
+        sync: false # the frontend's URL, e.g. https://hrms-web.onrender.com
+
+  - type: web
+    name: hrms-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false # e.g. https://hrms-api.onrender.com/api
+    routes:
+      # Client-side routing: every path serves index.html so a refresh on
+      # /employees/EMP001 does not 404.
+      - type: rewrite
+        source: /*
+        destination: /index.html
