@@ -3,7 +3,13 @@ import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
-import { AppError, BadRequestError, ConflictError, NotFoundError } from '../utils/AppError';
+import {
+  AppError,
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+  ServiceUnavailableError,
+} from '../utils/AppError';
 
 /** 404 for unmatched routes. Mounted after every real route. */
 export function notFoundHandler(req: Request, res: Response): void {
@@ -12,9 +18,28 @@ export function notFoundHandler(req: Request, res: Response): void {
   });
 }
 
+/**
+ * Prisma codes that mean "the database is busy or unreachable right now":
+ *   P1001 can't reach · P1002 timed out · P1008 operation timeout ·
+ *   P1017 server closed the connection · P2024 pool exhausted.
+ * These are 503s the client may retry, not 500s to be debugged.
+ */
+const TRANSIENT_DB_CODES = new Set(['P1001', 'P1002', 'P1008', 'P1017', 'P2024']);
+
 /** Maps Prisma's error codes onto the API's own error types. */
 function translatePrismaError(error: unknown): AppError | null {
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    return new ServiceUnavailableError('The database is not reachable right now. Please try again.');
+  }
   if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return null;
+
+  if (TRANSIENT_DB_CODES.has(error.code)) {
+    return new ServiceUnavailableError(
+      error.code === 'P2024'
+        ? 'The server is busy talking to the database. Please try again in a moment.'
+        : 'The database is not reachable right now. Please try again.',
+    );
+  }
 
   switch (error.code) {
     case 'P2002': {
@@ -59,8 +84,10 @@ export function errorHandler(
 
   if (appError) {
     if (appError.status >= 500) {
-      logger.error({ err: appError, path: req.originalUrl }, appError.message);
+      // Keep the original error for the log: the translated one loses the Prisma code.
+      logger.error({ err: error, path: req.originalUrl }, appError.message);
     }
+    if (appError.status === 503) res.setHeader('Retry-After', '5');
     res.status(appError.status).json({
       error: {
         code: appError.code,

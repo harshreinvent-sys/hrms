@@ -71,23 +71,24 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] Login page, app shell with role-aware nav
   - [x] Verified: build, lint, live sign-in in the browser pane, EMPLOYEE nav hides "Employees"
   - [x] Commit — `f397e1e`
-- [ ] **Slice 7 — Dashboard + MyProfile pages** (committed together with Slice 8)
+- [x] **Slice 7 — Dashboard + MyProfile pages** — committed `0d8f1c9` (with Slice 8)
   - [x] `pages/Dashboard.tsx` — role-scoped figures + department register; verified for employee (1/1/0) and admin
   - [x] `pages/MyProfile.tsx` — record + phone-only editor
-- [ ] **Slice 8 — EmployeeList / EmployeeDetail / EmployeeForm**
+- [x] **Slice 8 — EmployeeList / EmployeeDetail / EmployeeForm** — committed `0d8f1c9` (with Slice 7)
   - [x] `pages/EmployeeList.tsx` — URL-held search/filters/pagination, scoped department options, RoleGate'd Add
   - [x] `pages/EmployeeDetail.tsx` — Edit / Deactivate (modal), 403/404 states
   - [x] `pages/EmployeeForm.tsx` — create + edit; locked fields shown disabled; sends only dirty + permitted fields
   - [x] `lib/permissions.ts` mirror of `updatableFields`; `routes.tsx` role-guarded routes
   - [x] Verified in browser: admin create → EMP101 → deactivate; manager form locks 8 of 10 fields; employee redirected from /employees; 375px no overflow
-  - [ ] Commit
+  - [x] Commit — `0d8f1c9`
+- [x] **Post-frontend fix — login 500s under load** (AI-011): Prisma pool sized for the remote pooler (`connection_limit=15&pool_timeout=30`); transient DB errors → 503 + `Retry-After`; 12 error-handler unit tests; favicon
 - [ ] **Slice 9 — README + final verification pass**
 
 ## Next
 
-1. Commit Slices 7 + 8 (AI-010).
-2. **Slice 9 — README** in the spec's section order (Prerequisites, Installation, Environment variables, Database setup, Backend startup, Frontend startup, Test users, API documentation, Authorization test scenarios), then the final verification pass and `PROGRESS.md` close-out.
-3. User-side: run the Postman collection; open the frontend at `http://localhost:5173`.
+1. Commit the pool fix (AI-011).
+2. **Slice 9 — README** in the spec's section order, then the final verification pass and `PROGRESS.md` close-out.
+3. User-side: run the Postman collection; the frontend is at `http://localhost:5173`, the API at `http://localhost:4000` (Swagger `/api/docs`).
 
 ## Blockers
 

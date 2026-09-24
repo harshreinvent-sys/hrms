@@ -33,6 +33,7 @@ const config = {
       ...shared,
       displayName: 'unit',
       testMatch: ['<rootDir>/tests/unit/**/*.test.ts'],
+      setupFiles: ['<rootDir>/tests/setup/unitEnv.ts'],
     },
     {
       ...shared,

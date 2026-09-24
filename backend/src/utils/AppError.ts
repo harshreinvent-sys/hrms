@@ -43,3 +43,10 @@ export class ConflictError extends AppError {
     super(409, 'CONFLICT', message, details);
   }
 }
+
+/** The database could not be reached or its pool is exhausted — retryable, not a bug. */
+export class ServiceUnavailableError extends AppError {
+  constructor(message = 'The service is temporarily unavailable. Please try again.') {
+    super(503, 'SERVICE_UNAVAILABLE', message);
+  }
+}

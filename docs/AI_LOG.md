@@ -220,3 +220,21 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 - manager: register titled "My team" with exactly the four rows in scope; `/employees/EMP001/edit` → DOM check: `department`, `designation` editable; `firstName, lastName, email, phone, joiningDate, managerId, role, status` **LOCKED** — matches `employeePolicy.updatableFields` for a direct report.
 - mobile (375×812 emulation): `document.documentElement.scrollWidth === 375`, no horizontal page overflow; the table scrolls inside its wrapper; 18 rows.
 **Commit:** suggested — `feat(frontend): dashboard, profile, employee register, detail and form`
+
+## AI-011 — Login 500s under load: Prisma pool exhaustion (2026-09-24)
+**Prompt (summary):** User: "why getting this error" with browser console output — `POST /api/auth/login` → 500 (twice) plus `favicon.ico` 404s.
+**Diagnosis:** Reproduced a 200 immediately, no code changes on disk, error-filtered logs empty (pino's pretty output does not contain the literal word "error" on the level line). Raw log search for `500` and `Unhandled` found the cause: **Prisma `P2024` — "Timed out fetching a new connection from the connection pool (timeout 10, connection limit 9)"**, both at ~10 s response time. The frontend runs several queries per page (dashboard 3 in parallel, register 5), every authenticated call adds the `isActive` lookup, and each Supabase round trip holds a pool slot for 2–7 s. Two browser tabs of mine plus the user's filled the default pool (`CPUs*2+1 = 9`); the next login waited 10 s and failed.
+**Generated / changed:**
+- `backend/.env` — `&connection_limit=15&pool_timeout=30` appended to the pooled `DATABASE_URL` (mechanical edit; no secret retyped). `.env.example` documents both parameters and why.
+- `src/utils/AppError.ts` — `ServiceUnavailableError` (503).
+- `src/middleware/errorHandler.ts` — `P1001/P1002/P1008/P1017/P2024` and `PrismaClientInitializationError` → **503** with `Retry-After: 5` and a plain message; 5xx logs now carry the *original* error so the Prisma code is preserved.
+- `tests/setup/unitEnv.ts` (+ `jest.config.js`) — placeholder env for the `unit` project so modules that import `env.ts` can be unit-tested without a database.
+- `tests/unit/errorHandler.test.ts` — 12 tests: AppError pass-through, 404, Zod→400 with details, P2002→409, P2025→404, five transient codes→503 + `Retry-After`, init error→503, unknown→opaque 500 with no stack.
+- `frontend/index.html` — inline SVG favicon (an "H" on paper with a terracotta rule) so the 404 stops.
+- Closed my second browser tab to stop adding load.
+**Issues found:**
+- The `level: 'error'` log filter missed the failure because pino-pretty prints the level as a coloured `ERROR` token that the filter's substring match did not catch; searching the raw log for `500` did. Noted so the next investigation starts there.
+- The original `errorHandler` logged the *translated* `AppError`, which would have hidden the Prisma code. Now logs the original.
+**Human corrections:** None — user reported the symptom.
+**Verification:** `npm run typecheck` — clean. `npm run lint` — clean. Server auto-restarted at 11:35:41 (tsx watch, after the source edits), which also re-read `.env`. **12 concurrent logins → 12 × 200** (1.19–6.58 s) — with the old pool of 9 the overflow would have waited and failed. Direct check via a throwaway tsx script: `P2024 → 503 SERVICE_UNAVAILABLE Retry-After=5`, `P1001 → 503`, `P2002 → 409`. `npm run test:unit` result recorded in the commit message.
+**Commit:** suggested — `fix(db): size the Prisma pool for a remote pooler; map transient DB errors to 503`
