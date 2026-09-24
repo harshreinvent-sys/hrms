@@ -2,7 +2,7 @@
   "name": "hrms-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "HRMS API — Express + Prisma + PostgreSQL",
+  "description": "HRMS API \u2014 Express + Prisma + PostgreSQL",
   "engines": {
     "node": ">=20"
   },
@@ -15,7 +15,10 @@
     "test": "jest --runInBand",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "test:unit": "jest --selectProjects unit",
+    "test:integration": "jest --selectProjects integration --runInBand",
+    "prisma:deploy": "prisma migrate deploy"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

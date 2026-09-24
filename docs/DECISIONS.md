@@ -1,6 +1,6 @@
 # Decisions
 
-Format: context → decision → why → trade-off. Claude drafts; the human approves. Next id: **D-013**.
+Format: context → decision → why → trade-off. Claude drafts; the human approves. Next id: **D-015**.
 
 ## D-001 — Rebuild clean in `backend/`, drop out-of-spec modules
 **Context:** An API-only scaffold existed before the assessment brief arrived (flat `src/`, 4 roles, cuid IDs, attendance/leave/org, Vitest, inline authorization).
@@ -69,3 +69,15 @@ Format: context → decision → why → trade-off. Claude drafts; the human app
 **Decision (user-approved 2026-09-24):** `cors` (frontend on :5173 calls API on :4000), `dotenv` (loads `backend/.env`), `helmet` (security response headers), `pino-pretty` (dev-only readable logs).
 **Why:** The first two are presupposed by CLAUDE.md rules ("CORS origin from env", "config only from `.env`"). `helmet` addresses the "Security practices" evaluation criterion. `pino-pretty` is developer convenience.
 **Trade-off:** `cors`, `dotenv`, `pino-pretty` were installed before the question was asked (recorded in AI-001). Any further addition is asked first.
+
+## D-013 — Jest split into `unit` and `integration` projects
+**Context:** `employeePolicy.ts` is the file the assessment is graded on, and its tests need no database. Yet D-009's `globalSetup` resets a schema on every `npm test`, and `loadEnv` refuses to run without `.env.test`.
+**Decision:** Two Jest projects. `unit` (`tests/unit/**`) has no setup files and no env; `integration` (`tests/integration/**`) carries `loadEnv` + `globalSetup`. `npm test` runs both; `npm run test:unit` runs only the first.
+**Why:** The authorization rules can be verified anywhere — CI without secrets, a reviewer's laptop, this session before Supabase credentials exist. Coupling them to a live DB would make the most important tests the hardest to run.
+**Trade-off:** Two places to look for tests. Mitigated by the directory names.
+
+## D-014 — Delete code-review-graph's other-agent files
+**Context:** `code-review-graph install` wrote instruction files for Gemini, Qoder, CodeBuddy, Cursor, Windsurf, Kiro, opencode and GitHub Copilot (`AGENTS.md`, `GEMINI.md`, `QODER.md`, `CODEBUDDY.md`, `.cursorrules`, `.windsurfrules`, `opencode.jsonc`, `.codebuddy/`, `.gemini/`, `.qoder/`, `.kiro/`, `.github/`). D-002 left them in place; they were never committed.
+**Decision (user-approved 2026-09-24):** Delete them. code-review-graph stays installed; its `.mcp.json` entry and `.claude/` skills remain committed.
+**Why:** An assessment repo is read top-down by a reviewer. Twelve config files for tools the project does not use read as noise.
+**Trade-off:** Re-running `code-review-graph install` would recreate them; nobody should.

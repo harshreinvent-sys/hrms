@@ -33,4 +33,25 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 - The `package.json#prisma.seed` key triggers a Prisma 7 deprecation warning. Left in place: it is what `npx prisma db seed` (a CLAUDE.md command) reads.
 **Human corrections:** None during this slice. (Prior to it, the user redirected the whole project — see AI-000.)
 **Verification:** `cd backend && npx tsc -p tsconfig.json --noEmit` — clean, exit 0. `npm run lint` — clean, exit 0. `npx prisma generate` — client v6.19.3 generated. `codegraph init` — 33 files, 328 nodes, 927 edges (indexed before the restructure; auto-sync should pick up the moves, to be confirmed at Slice 2's graph check). No tests exist yet, so `npm test` was not run. Graph security checks are N/A: no routes exist in this slice.
-**Commit:** suggested — `chore: restructure into backend/, add docs set and CodeGraph tooling` (not committed; awaiting the user's go-ahead and the dependency answer).
+**Human corrections (addendum):** User approved all four extra dependencies (`cors`, `dotenv`, `helmet`, `pino-pretty`) and the commit. `helmet` installed and wired into `app.ts` before committing; `tsc` and lint re-run clean.
+**Commit:** `bd4becf` — `chore: restructure into backend/, add docs set and CodeGraph tooling` (35 files). Staged explicitly: `CLAUDE.md docs backend .mcp.json .gitignore .claude`. Left untracked on purpose: the other-agent files code-review-graph injected (`AGENTS.md`, `GEMINI.md`, `QODER.md`, `CODEBUDDY.md`, `.cursorrules`, `.windsurfrules`, `opencode.jsonc`, `.codebuddy/ .gemini/ .qoder/ .kiro/ .github/`) — flagged to the user as candidates for deletion. Git emitted LF→CRLF warnings on every file (`core.autocrlf=true` on this machine); a `.gitattributes` pinning LF goes into the Slice 1 commit so a reviewer's checkout is byte-identical.
+
+## AI-002 — Slice 1: data model, migration, seed, test wiring (2026-09-24)
+**Prompt (summary):** User: "create the full backend of it according to our req" — build Slices 1–5 continuously. Plan updated (execution mode only) and approved. This entry covers Slice 1.
+**Generated:**
+- `backend/prisma/migrations/20260924072540_init/migration.sql` — generated **offline** with `prisma migrate diff --from-empty --to-schema-datamodel --script` (dummy URLs in env; no DB contacted), then `CREATE SEQUENCE "employee_id_seq" START WITH 100` appended by hand (D-004). `migration_lock.toml` written by hand.
+- `backend/prisma/seed.ts` — 15 employees / 15 users; five login accounts with `Password@123`, ten non-login with random passwords; idempotent upserts. EMP010 manages exactly EMP001 + EMP002; EMP003 → EMP000.
+- `backend/tests/setup/loadEnv.ts`, `globalSetup.ts` — both refuse to run unless `DATABASE_URL` and `DIRECT_URL` contain `schema=test`.
+- `backend/jest.config.ts` rewritten as two projects `unit` / `integration` (D-013); `tests/{unit,integration,helpers}/` created.
+- `package.json` scripts: `test:unit`, `test:integration`, `prisma:deploy`.
+- `.gitattributes` (LF everywhere). `docs/DECISIONS.md` D-013, D-014.
+- Deleted (D-014, user-approved): `AGENTS.md GEMINI.md QODER.md CODEBUDDY.md .cursorrules .windsurfrules opencode.jsonc .codebuddy/ .gemini/ .qoder/ .kiro/ .github/`.
+- `codegraph index` re-run: 18 files, 127 nodes, 217 edges (was 33 files / stale pre-restructure index — the UserPromptSubmit hook had injected paths that no longer existed).
+**Issues found:**
+- **No database.** `backend/.env` and `.env.test` do not exist, so `prisma migrate dev` and `prisma db seed` could not be run. Worked around for the migration (offline diff, see above). The seed has been typechecked and linted but **has never executed**. Integration tests cannot run.
+- `prisma migrate diff` emitted `CREATE SCHEMA IF NOT EXISTS "public"` as its first statement — harmless on Supabase, kept as generated.
+- The stale CodeGraph context injected by the hook was ignored for planning; the plan already noted "re-index first".
+- `jest.config.ts` could not be loaded: Jest requires `ts-node` for a TypeScript config file, and `ts-node` is not a project dependency. Rewrote it as `jest.config.js` (CommonJS, JSDoc-typed) rather than add a dependency. The earlier standalone `tsc` pass over `jest.config.ts` had proved only that the file typechecked, not that Jest could read it.
+**Human corrections:** User chose "Delete them" for the CRG other-agent files. User changed execution mode from slice-by-slice approval to "build the full backend".
+**Verification:** `npx jest --selectProjects unit --passWithNoTests` — failed on the first run (`ts-node` missing for a `.ts` config, see above); passes after the `jest.config.js` rewrite: "Running one project: unit / No tests found, exiting with code 0". `npx tsc -p tsconfig.json --noEmit` — clean. `npm run lint` — clean. Standalone `tsc` over `prisma/seed.ts`, `tests/setup/*.ts`, `jest.config.ts` — clean. **Not verified:** migration applies; seed runs; anything touching Postgres.
+**Commit:** suggested — `feat(db): initial migration, seed data and Jest unit/integration split`
