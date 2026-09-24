@@ -2,8 +2,24 @@ import axios, { AxiosError } from 'axios';
 import type { ApiError } from '../types/api';
 import { clearToken, getToken, SESSION_EXPIRED_EVENT } from '../auth/token';
 
+/**
+ * The API mounts every route under /api, so the base URL must end with it.
+ * A missing suffix is the most common deploy mistake and produces a confusing
+ * CORS-looking failure on a 404, so it is called out in the console instead.
+ */
+function resolveBaseUrl(): string {
+  const raw = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || 'http://localhost:4000/api';
+  const base = raw.replace(/\/+$/, '');
+  if (!/\/api$/i.test(base)) {
+    console.warn(
+      `[hrms] VITE_API_URL is "${raw}" — it should end with /api (e.g. https://your-backend.onrender.com/api). Requests will go to ${base}/auth/login, which the API does not serve.`,
+    );
+  }
+  return base;
+}
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api',
+  baseURL: resolveBaseUrl(),
   timeout: 30_000,
   headers: { 'Content-Type': 'application/json' },
 });

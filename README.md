@@ -67,7 +67,7 @@ cp frontend/.env.example frontend/.env
 | `JWT_SECRET` | ≥ 32 characters. Generate: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
 | `JWT_EXPIRES_IN` | Access-token lifetime, default `30m` |
 | `PORT` | default `4000` |
-| `CORS_ORIGIN` | Comma-separated browser origins, default `http://localhost:5173` |
+| `CORS_ORIGIN` | Comma-separated browser origins, default `http://localhost:5173`. `*` matches one host label, e.g. `https://*.vercel.app` |
 | `LOG_LEVEL` | `silent \| fatal \| error \| warn \| info \| debug \| trace`, default `info` |
 
 The environment is validated at boot ([`backend/src/config/env.ts`](backend/src/config/env.ts)); a missing or malformed value stops the server with a message naming it.
@@ -226,6 +226,21 @@ If you configure the services by hand instead, the two things that matter:
 - **Migrations run at start**, not at build: `npm run deploy`. Build environments on Render cannot reach the database.
 
 The health check is `GET /health`. Expect the first request after a cold start on the free tier to take several seconds.
+
+### Frontend on Vercel (instead of Render's static site)
+
+1. Import the repo; set **Root Directory** to `frontend` (Vercel detects Vite).
+2. Environment variable **`VITE_API_URL` = `https://<your-api>.onrender.com/api`** — the `/api` suffix is required; without it the app calls `/auth/login` at the domain root and the browser reports it as a CORS failure. The app prints a console warning when the suffix is missing.
+3. `frontend/vercel.json` already contains the `/(.*) → /index.html` rewrite for client-side routing.
+4. On the **backend**, set `CORS_ORIGIN` to the Vercel URL. Vercel gives each preview deployment its own subdomain, so a pattern keeps them all working:
+   ```
+   CORS_ORIGIN=https://hrms-two-drab.vercel.app,https://*.vercel.app
+   ```
+   `*` stands for one host label. Comma-separate as many entries as you need.
+
+Symptom → cause, for the browser console:
+- `No 'Access-Control-Allow-Origin' header` → the page's origin is not in `CORS_ORIGIN` (the backend also logs `CORS: origin not in CORS_ORIGIN` with the offending origin).
+- The failing URL lacks `/api` → `VITE_API_URL` is missing the suffix; fix and **redeploy** (it is baked in at build time).
 
 ## Project structure
 

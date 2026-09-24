@@ -307,3 +307,17 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 **Human corrections:** None; the user reported logs.
 **Verification:** `node scripts/deploy.cjs` with `RENDER=1`: printed both hosts, detected the IPv6 host, derived `aws-0-ap-southeast-1.pooler.supabase.com:5432`, ran `prisma migrate deploy` → `P1000`, exited 1 without starting the server (correct behaviour). Without `RENDER`: no rewrite, direct host used → `P1000` (proves the failure is external). `npm run test:unit` — result recorded in the commit. **Not verified:** a successful migration through the session pooler, and the Render deploy itself — both blocked on the current password.
 **Commit:** suggested — `build(deploy): preflight script derives the session pooler on Render; P1000 → 503`
+
+## AI-017 — Vercel frontend blocked by CORS; VITE_API_URL missing /api (2026-09-25)
+**Prompt (summary):** Frontend on Vercel, backend on Render; browser: "Access to XMLHttpRequest at https://hrms-a8v3.onrender.com/auth/login from origin https://hrms-two-drab.vercel.app has been blocked by CORS policy: No Access-Control-Allow-Origin header".
+**Diagnosis:** Two independent misconfigurations in one line. (1) The URL lacks `/api` → `VITE_API_URL` on Vercel is the bare backend origin. (2) A live preflight from the Vercel origin returned 204 with allow-methods/headers but **no** `access-control-allow-origin` → `CORS_ORIGIN` on Render does not include the Vercel URL. Backend itself healthy (`/health` 200).
+**Generated / changed:**
+- `backend/src/utils/cors.ts` — pure `compileOriginMatcher`: exact origins (case-insensitive, trailing slash tolerant) plus `*` = one host label, so `https://*.vercel.app` covers every Vercel preview deployment. `app.ts` uses it via a `cors` origin callback; requests without an Origin header are allowed (not browser-initiated); rejected origins are logged with the configured list.
+- `backend/tests/unit/cors.test.ts` — 5 tests (exact, list parsing, wildcard incl. one-label limit and injection attempt, regex escaping, empty list).
+- `frontend/src/api/client.ts` — `resolveBaseUrl()` trims a trailing slash and prints a console warning naming the exact wrong URL when `VITE_API_URL` does not end in `/api`.
+- `frontend/vercel.json` — `/(.*) → /index.html` rewrite for client-side routing.
+- README: "Frontend on Vercel" subsection with the symptom→cause table; `.env.example` documents the `*` pattern.
+**Issues found:** None in code; both were deployment settings. The hardening turns each into a logged, named condition instead of a bare browser CORS error.
+**Human corrections:** None; user reported the browser error.
+**Verification:** Live probe of `https://hrms-a8v3.onrender.com`: `/health` 200; preflight with the Vercel Origin → 204 without `allow-origin` (confirms cause 2). `npm run typecheck`, `lint` clean; `npm run test:unit` 52/52. Frontend build + lint clean. DB-free smoke of the real middleware with `CORS_ORIGIN=http://localhost:5173,https://hrms-two-drab.vercel.app,https://*.vercel.app`: exact → 204 + allow-origin; preview subdomain → 204 + allow-origin; `https://evil.example` → no header; no Origin → 204. Not verified: the deployed pair after the user updates both settings.
+**Commit:** suggested — `feat(cors): wildcard origins for preview deployments; warn on VITE_API_URL without /api`

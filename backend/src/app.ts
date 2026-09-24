@@ -6,6 +6,8 @@ import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yaml';
 import { env } from './config/env';
+import { compileOriginMatcher } from './utils/cors';
+import { logger } from './utils/logger';
 import { requestLogger } from './middleware/requestLogger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { apiRouter } from './routes';
@@ -30,9 +32,20 @@ export function createApp(): Express {
   // Security headers first so they apply to every response, including errors.
   app.use(helmet());
   app.use(requestLogger);
+  // Browsers send Origin; curl, health checks and server-to-server calls do not.
+  // Requests without one are allowed through (they cannot be a CORS attack);
+  // requests with one must match CORS_ORIGIN, which may contain `*` patterns.
+  const originAllowed = compileOriginMatcher(env.corsOrigins);
   app.use(
     cors({
-      origin: env.corsOrigins,
+      origin(origin, callback) {
+        if (!origin || originAllowed(origin)) {
+          callback(null, true);
+          return;
+        }
+        logger.warn({ origin, allowed: env.corsOrigins }, 'CORS: origin not in CORS_ORIGIN');
+        callback(null, false);
+      },
       credentials: true,
     }),
   );
