@@ -57,7 +57,7 @@ describe('errorHandler', () => {
     expect(run(prismaError('P2025')).status).toBe(404);
   });
 
-  it.each(['P2024', 'P1001', 'P1002', 'P1008', 'P1017'])(
+  it.each(['P2024', 'P1000', 'P1001', 'P1002', 'P1008', 'P1017'])(
     'maps transient database error %s to 503 with Retry-After',
     (code) => {
       const r = run(prismaError(code));

@@ -292,3 +292,18 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 **Human corrections:** None; user reported the log.
 **Verification:** Not verifiable locally (this machine has IPv6, so the direct host works here). The fix is the user setting `DIRECT_URL` on Render to the Session pooler URL (`aws-0-<region>.pooler.supabase.com:5432`); the next deploy log confirms it.
 **Commit:** suggested — `docs: Render needs the Supabase session pooler for DIRECT_URL (direct host is IPv6-only)`
+
+## AI-016 — Render still P1001; deploy script; then the database password turned out to have changed (2026-09-25)
+**Prompt (summary):** User: "still same issue why it is running on localhost but not on render", with a third log still showing the `db.<ref>.supabase.co` host.
+**Generated / changed:**
+- `backend/scripts/deploy.cjs` — replaces the `&&` chain as `npm run deploy`. Prints the **host** (never credentials) of `DATABASE_URL` and `DIRECT_URL` so the deploy log shows what the platform actually has; when `RENDER` is set, `DIRECT_URL` is the IPv6-only direct host and `DATABASE_URL` is on the pooler, it derives the Session-pooler URL (port 5432, no query string, same credentials as the pooled URL), warns with both hosts, and uses it for `prisma migrate deploy`; refuses to start the server if the migration fails.
+- `src/middleware/errorHandler.ts` — `P1000` (authentication failed) added to the codes that map to 503; unit test list extended.
+- README deployment section describes the script and the auto-derivation.
+**Issues found:**
+- **The answer to "why localhost but not Render":** the laptop has IPv6, Render's free tier does not, and the direct host is IPv6-only. Documented in AI-015; the script now makes it a warning instead of a failure.
+- **Testing the script locally revealed a second, external problem:** `prisma migrate deploy` — plain, no script — now fails with `P1000: Authentication failed` on the same local `.env` that applied the migration, seeded, and passed 162 tests earlier the same day; a login through the running dev server fails the same way on the pooled URL. Both connection paths, same credentials, both broken → **the Supabase database password was changed after those runs**, outside this session. Consequence: the script's session-pooler branch executed correctly (host lines and derivation visible in the log) but could not be proven to connect. The user must update `backend/.env` and `.env.test` with the current password and confirm the value on Render.
+- Side effect noticed: the API returned that auth failure as a **500 `INTERNAL_ERROR`** with the Prisma message in the dev `debug` field. `P1000` was missing from the 503 mapping; fixed.
+- Render's three failed deploys were therefore stacked: (1) no `prisma generate` — fixed AI-014; (2) IPv6-only host — worked around here; (3) credentials — the user's to set.
+**Human corrections:** None; the user reported logs.
+**Verification:** `node scripts/deploy.cjs` with `RENDER=1`: printed both hosts, detected the IPv6 host, derived `aws-0-ap-southeast-1.pooler.supabase.com:5432`, ran `prisma migrate deploy` → `P1000`, exited 1 without starting the server (correct behaviour). Without `RENDER`: no rewrite, direct host used → `P1000` (proves the failure is external). `npm run test:unit` — result recorded in the commit. **Not verified:** a successful migration through the session pooler, and the Render deploy itself — both blocked on the current password.
+**Commit:** suggested — `build(deploy): preflight script derives the session pooler on Render; P1000 → 503`

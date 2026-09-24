@@ -19,12 +19,14 @@ export function notFoundHandler(req: Request, res: Response): void {
 }
 
 /**
- * Prisma codes that mean "the database is busy or unreachable right now":
- *   P1001 can't reach · P1002 timed out · P1008 operation timeout ·
- *   P1017 server closed the connection · P2024 pool exhausted.
- * These are 503s the client may retry, not 500s to be debugged.
+ * Prisma codes that mean "the database is not available to this server right now":
+ *   P1000 authentication failed (misconfigured credentials) · P1001 can't reach ·
+ *   P1002 timed out · P1008 operation timeout · P1017 server closed the
+ *   connection · P2024 pool exhausted.
+ * From the client's side these are all the same outage: a 503 to retry or
+ * report, never a 500 to debug in the request.
  */
-const TRANSIENT_DB_CODES = new Set(['P1001', 'P1002', 'P1008', 'P1017', 'P2024']);
+const TRANSIENT_DB_CODES = new Set(['P1000', 'P1001', 'P1002', 'P1008', 'P1017', 'P2024']);
 
 /** Maps Prisma's error codes onto the API's own error types. */
 function translatePrismaError(error: unknown): AppError | null {
