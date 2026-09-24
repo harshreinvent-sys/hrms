@@ -30,7 +30,7 @@ services:
       - key: DATABASE_URL
         sync: false # Supabase pooled URL, port 6543, ...?pgbouncer=true&connection_limit=15&pool_timeout=30
       - key: DIRECT_URL
-        sync: false # Supabase direct URL, port 5432
+        sync: false # Supabase SESSION POOLER URL (aws-0-<region>.pooler.supabase.com:5432) — the db.<ref>.supabase.co host is IPv6-only and unreachable from Render
       - key: JWT_SECRET
         generateValue: true # Render generates a random 256-bit value
       - key: CORS_ORIGIN

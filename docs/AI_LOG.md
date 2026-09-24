@@ -284,3 +284,11 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 **Human corrections:** User reported the failure; no instruction changes.
 **Verification (local simulation of Render's sequence):** `npm install` → `postinstall` ran; `npm run build` → clean; `PORT=4100 node dist/server.js` → `GET /health` 200, `GET /api/docs.json` 200 (the compiled build resolves `openapi.yaml` correctly from `dist/`). `render.yaml` parsed with the `yaml` package: two services, expected build/start commands and rewrite rule. Not verified: an actual Render deploy — that runs on the user's account after this push.
 **Commit:** suggested — `build: generate Prisma client on install; Render blueprint and deploy docs`
+
+## AI-015 — Render deploy: P1001 on the Supabase direct host (2026-09-25)
+**Prompt (summary):** User pasted the next Render log. Build now succeeds (postinstall generated the client, `tsc` compiled); `npm run deploy` fails at `prisma migrate deploy` with `P1001: Can't reach database server at db.<ref>.supabase.co:5432`.
+**Diagnosis:** Supabase's "Direct connection" host is IPv6-only; Render's free tier has no outbound IPv6. Works from the user's laptop (IPv6 present), unreachable from Render. Not a code issue.
+**Generated / changed:** Docs only — `backend/.env.example` explains the two `DIRECT_URL` hosts and when each works; `render.yaml` comment on `DIRECT_URL`; README deployment section gains the warning. No source changes.
+**Human corrections:** None; user reported the log.
+**Verification:** Not verifiable locally (this machine has IPv6, so the direct host works here). The fix is the user setting `DIRECT_URL` on Render to the Session pooler URL (`aws-0-<region>.pooler.supabase.com:5432`); the next deploy log confirms it.
+**Commit:** suggested — `docs: Render needs the Supabase session pooler for DIRECT_URL (direct host is IPv6-only)`
