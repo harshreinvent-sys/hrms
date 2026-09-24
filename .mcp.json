@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "code-review-graph": {
+      "command": "C:\\Python314\\python.exe",
+      "args": [
+        "-m",
+        "code_review_graph",
+        "serve"
+      ],
+      "cwd": "D:\\Harsh\\HRMS",
+      "type": "stdio"
+    },
+    "codegraph": {
+      "type": "stdio",
+      "command": "codegraph",
+      "args": [
+        "serve",
+        "--mcp"
+      ]
+    }
+  }
+}
