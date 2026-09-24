@@ -28,10 +28,24 @@ export function notFoundHandler(req: Request, res: Response): void {
  */
 const TRANSIENT_DB_CODES = new Set(['P1000', 'P1001', 'P1002', 'P1008', 'P1017', 'P2024']);
 
+/**
+ * Postgres complaints that mean Prisma is using prepared statements through a
+ * transaction-mode pooler (Supabase/PgBouncer without `pgbouncer=true`).
+ * Sequential requests work; the first parallel pair fails — the symptom is
+ * "login works, dashboard 500s". Logged with the remedy, returned as 503.
+ */
+const POOLER_MISCONFIG = /prepared statement .* (already exists|does not exist)|42P05|26000|bind message supplies/i;
+
 /** Maps Prisma's error codes onto the API's own error types. */
 function translatePrismaError(error: unknown): AppError | null {
   if (error instanceof Prisma.PrismaClientInitializationError) {
     return new ServiceUnavailableError('The database is not reachable right now. Please try again.');
+  }
+  if (error instanceof Prisma.PrismaClientUnknownRequestError && POOLER_MISCONFIG.test(error.message)) {
+    logger.error(
+      'Prisma is running prepared statements through a transaction-mode pooler. Add `?pgbouncer=true` to DATABASE_URL (the deploy script does this automatically for Supabase).',
+    );
+    return new ServiceUnavailableError('The database connection is misconfigured. Please try again shortly.');
   }
   if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return null;
 

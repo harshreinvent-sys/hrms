@@ -72,6 +72,17 @@ describe('errorHandler', () => {
     expect(r.status).toBe(503);
   });
 
+  it('maps a prepared-statement collision (pooler without pgbouncer=true) to 503', () => {
+    const r = run(new Prisma.PrismaClientUnknownRequestError('ERROR: prepared statement "s0" already exists', { clientVersion: '6.19.3' }));
+    expect(r.status).toBe(503);
+    expect(r.body.error.code).toBe('SERVICE_UNAVAILABLE');
+  });
+
+  it('leaves other unknown Prisma request errors as opaque 500s', () => {
+    const r = run(new Prisma.PrismaClientUnknownRequestError('something else entirely', { clientVersion: '6.19.3' }));
+    expect(r.status).toBe(500);
+  });
+
   it('turns an unknown error into an opaque 500 that never leaks a stack', () => {
     const r = run(new Error('secret internal detail'));
     expect(r.status).toBe(500);
