@@ -25,15 +25,23 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] CRG other-agent files deleted (D-014); CodeGraph re-indexed (18 files)
   - [ ] **BLOCKED — needs `backend/.env` + `.env.test`:** `npx prisma migrate deploy` (apply), `npx prisma db seed` (15/15), integration tests
   - [x] Commit — `491e917`
-- [ ] **Slice 2 — Auth: login / logout + `authenticate` in use + OpenAPI bootstrap** (`/api/me` moved to Slice 3 — it is an employee read path)
+- [x] **Slice 2 — Auth: login / logout + `authenticate` in use + OpenAPI bootstrap** — committed `8b9755e` (`/api/me` moved to Slice 3 — it is an employee read path)
   - [x] `modules/auth`: `POST /api/auth/login`, `POST /api/auth/logout`
   - [x] `routes.ts`, `app.ts` mounts `/api`, `/api/docs`, `/api/docs.json`
   - [x] `openapi.yaml` bootstrap (schemas, shared responses, auth paths)
   - [x] `tests/helpers/{seedUsers,app}.ts`, `tests/integration/auth.test.ts` (17 tests) — **written, not run** (no `.env.test`)
   - [x] `tsconfig.test.json`; `npm run typecheck` covers src + tests + prisma
   - [x] Verified: tsc (both configs), lint, DB-free smoke run, graph check
+  - [x] Commit — `8b9755e`
+- [ ] **Slice 3 — `employeePolicy.ts` + read paths + `/me` + `AUTHORIZATION.md` + read-half of `authorization.test.ts`**
+  - [x] `policies/employeePolicy.ts` — `canView`, `canCreate`, `canDelete`, `discloseMissing`, `updatableFields`, `scopeWhere`
+  - [x] `tests/unit/employeePolicy.test.ts` — **34/34 passing** (no DB)
+  - [x] `modules/employees` read paths: `GET /api/employees`, `GET /api/employees/:id`; `GET /api/me`
+  - [x] `openapi.yaml`: Employee schemas + three paths
+  - [x] `tests/integration/authorization.test.ts` read half (30 tests) — **written, not run**
+  - [x] `docs/AUTHORIZATION.md` matches the policy file
+  - [x] Verified: typecheck, lint, unit tests, rule-3 grep, smoke, graph check
   - [ ] Commit
-- [ ] **Slice 3 — `employeePolicy.ts` + read paths + `AUTHORIZATION.md` + read-half of `authorization.test.ts`**
 - [ ] **Slice 4 — Write paths (POST / PUT / DELETE) + write-half of `authorization.test.ts` + `employees.test.ts`**
 - [ ] **Slice 5 — Dashboard stats + complete `openapi.yaml` + Postman collection**
 - [ ] **Slice 6 — Frontend scaffold + auth (Login, AuthContext, interceptors, ProtectedRoute, RoleGate)**

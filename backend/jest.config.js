@@ -17,16 +17,17 @@
  * and that is not a project dependency.
  */
 
-/** @type {Pick<Config, 'preset' | 'testEnvironment' | 'testTimeout'>} */
+/** @type {Pick<Config, 'preset' | 'testEnvironment'>} */
 const shared = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testTimeout: 30_000,
 };
 
 /** @type {Config} */
 const config = {
   verbose: true,
+  // Global, not per-project: integration tests pay for bcrypt + a remote DB.
+  testTimeout: 30_000,
   projects: [
     {
       ...shared,

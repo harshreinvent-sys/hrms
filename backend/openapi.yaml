@@ -68,6 +68,55 @@ components:
       type: string
       enum: [ACTIVE, INACTIVE]
 
+    Employee:
+      type: object
+      required: [id, firstName, lastName, email, department, designation, joiningDate, status, role, managerId, manager, createdAt, updatedAt]
+      properties:
+        id: { type: string, example: EMP001, description: Public id, server-generated. }
+        firstName: { type: string, example: Neha }
+        lastName: { type: string, example: Kulkarni }
+        email: { type: string, format: email, example: employee1@company.com }
+        phone: { type: string, nullable: true, example: '+91-98450-00001' }
+        department: { type: string, example: Engineering }
+        designation: { type: string, example: Software Engineer }
+        joiningDate: { type: string, format: date, example: '2022-01-10' }
+        status: { $ref: '#/components/schemas/EmploymentStatus' }
+        role:
+          allOf: [{ $ref: '#/components/schemas/Role' }]
+          nullable: true
+          description: From the linked login account.
+        managerId: { type: string, nullable: true, example: EMP010 }
+        manager:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string, example: EMP010 }
+            name: { type: string, example: Rahul Verma }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    EmployeeResponse:
+      type: object
+      required: [employee]
+      properties:
+        employee: { $ref: '#/components/schemas/Employee' }
+
+    EmployeeListResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Employee' }
+        pagination:
+          type: object
+          required: [page, limit, total, totalPages]
+          properties:
+            page: { type: integer, example: 1 }
+            limit: { type: integer, example: 20 }
+            total: { type: integer, example: 15, description: Rows visible to the caller after scoping. }
+            totalPages: { type: integer, example: 1 }
+
     LoginRequest:
       type: object
       required: [email, password]
@@ -179,3 +228,71 @@ paths:
       responses:
         '204': { description: Logged out. }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /me:
+    get:
+      tags: [Employees]
+      summary: The caller's own employee profile
+      description: The employee id is taken from the token, never from the request.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: The caller's record.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmployeeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /employees:
+    get:
+      tags: [Employees]
+      summary: List employees visible to the caller
+      description: |
+        Scoped **inside the database query** to what the caller may see:
+        `ADMIN` → everyone · `MANAGER` → self + direct reports · `EMPLOYEE` → self.
+        Filters narrow that scope; they can never widen it.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: search, in: query, schema: { type: string, maxLength: 100 }, description: Case-insensitive match on id, first name, last name or email. }
+        - { name: department, in: query, schema: { type: string }, description: Exact match. }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/EmploymentStatus' } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Scoped, paginated list.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmployeeListResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /employees/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, pattern: '^EMP\d{3,}$' }
+        example: EMP001
+    get:
+      tags: [Employees]
+      summary: Get one employee
+      description: |
+        Object-level authorization:
+        - `ADMIN` → any id; **404** if it does not exist.
+        - `MANAGER` → self or a direct report; anything else → **403**, whether or not the id exists.
+        - `EMPLOYEE` → self only; anything else → **403**, whether or not the id exists.
+
+        Spec §9 Test 1: `employee1` → `EMP001` → 200. Test 2: `employee1` → `EMP002` → 403.
+        Test 4: `admin` → `EMP002` → 200. Test 6: `manager` → `EMP003` → 403.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: The employee.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmployeeResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
