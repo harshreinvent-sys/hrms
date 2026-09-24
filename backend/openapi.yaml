@@ -1,0 +1,181 @@
+openapi: 3.0.3
+info:
+  title: HRMS API
+  version: 0.1.0
+  description: |
+    HR Management System API.
+
+    **Authentication:** `POST /api/auth/login` returns a JWT valid for 30 minutes.
+    Send it as `Authorization: Bearer <token>` on every other route.
+
+    **Authorization** is enforced server-side from the token's identity, never from
+    ids in the request. Object-level denial returns **403**. An `ADMIN` asking for an
+    id that does not exist receives **404**; any other role receives **403** for any id
+    outside their scope, whether or not it exists (existence is not disclosed).
+    See `docs/AUTHORIZATION.md`.
+
+    **Seed accounts** (password `Password@123`): `admin@company.com` (ADMIN, EMP000),
+    `manager@company.com` (MANAGER, EMP010; manages EMP001 and EMP002),
+    `employee1@company.com` (EMP001), `employee2@company.com` (EMP002),
+    `employee3@company.com` (EMP003, reports to EMP000).
+
+servers:
+  - url: http://localhost:4000/api
+    description: Local development
+
+tags:
+  - name: Auth
+  - name: Employees
+  - name: Dashboard
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: FORBIDDEN
+              enum: [BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, INTERNAL_ERROR]
+            message:
+              type: string
+              example: You do not have access to this resource
+            details:
+              description: Present on validation errors and field-level authorization errors.
+              type: array
+              items:
+                type: object
+                properties:
+                  path: { type: string, example: email }
+                  message: { type: string, example: A valid email is required }
+
+    Role:
+      type: string
+      enum: [ADMIN, MANAGER, EMPLOYEE]
+
+    EmploymentStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE]
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      additionalProperties: false
+      properties:
+        email: { type: string, format: email, example: employee1@company.com }
+        password: { type: string, format: password, example: Password@123 }
+
+    LoginResponse:
+      type: object
+      required: [token, expiresIn, user]
+      properties:
+        token:
+          type: string
+          description: JWT access token.
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        expiresIn:
+          type: integer
+          description: Seconds until the token expires.
+          example: 1800
+        user:
+          type: object
+          required: [id, email, role, employeeId, name]
+          properties:
+            id: { type: string, example: clx0abc123 }
+            email: { type: string, format: email, example: employee1@company.com }
+            role: { $ref: '#/components/schemas/Role' }
+            employeeId: { type: string, example: EMP001 }
+            name: { type: string, example: Neha Kulkarni }
+
+  responses:
+    BadRequest:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error:
+              code: BAD_REQUEST
+              message: Request validation failed
+              details: [{ path: password, message: Required }]
+    Unauthorized:
+      description: Missing, malformed, expired or tampered token, or the account is inactive.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: UNAUTHORIZED, message: Invalid or expired token }
+    Forbidden:
+      description: Authenticated, but the action or object is outside the caller's rights.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: FORBIDDEN, message: You do not have access to this resource }
+    NotFound:
+      description: Resource does not exist (only returned to callers who could otherwise see it).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: NOT_FOUND, message: Employee not found }
+    Conflict:
+      description: A uniqueness constraint was violated.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: CONFLICT, message: A record with this email already exists }
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in and receive a JWT
+      description: |
+        The response for an unknown email and for a wrong password is identical
+        (`401`, "Invalid email or password"), so the endpoint cannot be used to
+        enumerate accounts. A deactivated account with the correct password also
+        receives `401`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Authenticated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          description: Invalid credentials or deactivated account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: UNAUTHORIZED, message: Invalid email or password }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out
+      description: |
+        Tokens are stateless; the client discards its copy. The route requires a
+        valid token so that a bad token receives the same `401` as everywhere else.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Logged out. }
+        '401': { $ref: '#/components/responses/Unauthorized' }

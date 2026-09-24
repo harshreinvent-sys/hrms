@@ -20,6 +20,18 @@ export function signAccessToken(payload: AccessTokenPayload): string {
   });
 }
 
+/**
+ * Seconds until the token expires, read from its own `exp`/`iat` claims so the
+ * login response and the token can never disagree about the lifetime.
+ */
+export function getTokenLifetimeSeconds(token: string): number {
+  const decoded = jwt.decode(token);
+  if (typeof decoded !== 'object' || decoded === null || !decoded.exp || !decoded.iat) {
+    throw new Error('Token is missing exp/iat claims');
+  }
+  return decoded.exp - decoded.iat;
+}
+
 /** Throws on a malformed, tampered, or expired token. Callers map that to 401. */
 export function verifyAccessToken(token: string): AccessTokenPayload {
   const decoded = jwt.verify(token, env.JWT_SECRET);

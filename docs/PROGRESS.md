@@ -15,7 +15,7 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] Ported files compile and lint: `cd backend && npx tsc --noEmit && npm run lint` — both clean
   - [x] Dependency question answered — user approved `cors`, `dotenv`, `helmet`, `pino-pretty` (D-012)
   - [x] Commit — `bd4becf`
-- [ ] **Slice 1 — Data model, migration, seed**
+- [x] **Slice 1 — Data model, migration, seed** — committed `491e917` (DB apply/seed still pending credentials)
   - [x] `backend/prisma/schema.prisma` (done in Slice 0)
   - [x] `backend/prisma/seed.ts` — 5 login users + 10 non-login employees, idempotent upserts
   - [x] `backend/tests/setup/loadEnv.ts`, `globalSetup.ts` — load `.env.test`, `db push --force-reset`, seed
@@ -24,8 +24,15 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] Jest split into `unit` / `integration` projects (D-013); `test:unit`, `test:integration`, `prisma:deploy` scripts
   - [x] CRG other-agent files deleted (D-014); CodeGraph re-indexed (18 files)
   - [ ] **BLOCKED — needs `backend/.env` + `.env.test`:** `npx prisma migrate deploy` (apply), `npx prisma db seed` (15/15), integration tests
+  - [x] Commit — `491e917`
+- [ ] **Slice 2 — Auth: login / logout + `authenticate` in use + OpenAPI bootstrap** (`/api/me` moved to Slice 3 — it is an employee read path)
+  - [x] `modules/auth`: `POST /api/auth/login`, `POST /api/auth/logout`
+  - [x] `routes.ts`, `app.ts` mounts `/api`, `/api/docs`, `/api/docs.json`
+  - [x] `openapi.yaml` bootstrap (schemas, shared responses, auth paths)
+  - [x] `tests/helpers/{seedUsers,app}.ts`, `tests/integration/auth.test.ts` (17 tests) — **written, not run** (no `.env.test`)
+  - [x] `tsconfig.test.json`; `npm run typecheck` covers src + tests + prisma
+  - [x] Verified: tsc (both configs), lint, DB-free smoke run, graph check
   - [ ] Commit
-- [ ] **Slice 2 — Auth: login / logout / me + `authenticate` (with `isActive` re-check)**
 - [ ] **Slice 3 — `employeePolicy.ts` + read paths + `AUTHORIZATION.md` + read-half of `authorization.test.ts`**
 - [ ] **Slice 4 — Write paths (POST / PUT / DELETE) + write-half of `authorization.test.ts` + `employees.test.ts`**
 - [ ] **Slice 5 — Dashboard stats + complete `openapi.yaml` + Postman collection**
@@ -36,7 +43,7 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
 
 ## Next
 
-Slice 1, DB half: once `backend/.env` and `backend/.env.test` exist, run `npx prisma migrate dev --name init`, add the sequence to the migration, seed, verify 15/15, commit. Then Slice 2 (auth).
+Slice 2 (auth) → 3 (policy + reads) → 4 (writes) → 5 (dashboard, OpenAPI, Postman), continuously, one commit each. Integration tests are written as each slice lands and run the moment `backend/.env.test` exists.
 
 ## Blockers
 
