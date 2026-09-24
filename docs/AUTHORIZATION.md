@@ -53,7 +53,7 @@ scopeWhere(actor) → Prisma.EmployeeWhereInput
 | `POST /api/employees` | `canCreate` before anything else; then Employee + User created in one transaction |
 | `PUT /api/employees/:id` | fetch as above (inherits 403/404) → `updatableFields` → any body key outside the set → **403** with `details: [field]`, before Prisma is touched; `email`/`status` mirrored onto User (D-015) |
 | `DELETE /api/employees/:id` | `canDelete` → fetch as above → soft delete (Employee.status + User.isActive, one transaction) |
-| `GET /api/dashboard/stats` | every count and `groupBy` carries `scopeWhere(actor)` *(Slice 5)* |
+| `GET /api/dashboard/stats` | every count and the department `groupBy` carry `scopeWhere(actor)` — the dashboard can never show more than the list |
 
 ## Status codes
 

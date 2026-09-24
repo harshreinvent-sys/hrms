@@ -161,6 +161,24 @@ components:
         role: { $ref: '#/components/schemas/Role' }
         status: { $ref: '#/components/schemas/EmploymentStatus' }
 
+    DashboardStats:
+      type: object
+      required: [total, active, inactive, byDepartment]
+      description: All numbers are scoped to what the caller may see.
+      properties:
+        total: { type: integer, example: 16 }
+        active: { type: integer, example: 14 }
+        inactive: { type: integer, example: 2 }
+        byDepartment:
+          type: array
+          description: Sorted by department name; counts sum to `total`.
+          items:
+            type: object
+            required: [department, count]
+            properties:
+              department: { type: string, example: Engineering }
+              count: { type: integer, example: 5 }
+
     LoginRequest:
       type: object
       required: [email, password]
@@ -271,6 +289,41 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '204': { description: Logged out. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /dashboard/stats:
+    get:
+      tags: [Dashboard]
+      summary: Headline numbers, scoped to the caller
+      description: |
+        `ADMIN` → the whole company · `MANAGER` → self + direct reports · `EMPLOYEE` → themself
+        (`total: 1`). The same `scopeWhere` used by the employee list is applied inside every
+        count and the department grouping, so the dashboard can never reveal more than the list.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Scoped statistics.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardStats' }
+              examples:
+                admin:
+                  value:
+                    total: 16
+                    active: 14
+                    inactive: 2
+                    byDepartment:
+                      - { department: Engineering, count: 5 }
+                      - { department: Finance, count: 3 }
+                      - { department: HR, count: 2 }
+                      - { department: Marketing, count: 3 }
+                      - { department: Sales, count: 4 }
+                employee1:
+                  value:
+                    total: 1
+                    active: 1
+                    inactive: 0
+                    byDepartment: [{ department: Engineering, count: 1 }]
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /me:

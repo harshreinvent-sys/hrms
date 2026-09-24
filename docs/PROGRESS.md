@@ -42,7 +42,7 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] `docs/AUTHORIZATION.md` matches the policy file
   - [x] Verified: typecheck, lint, unit tests, rule-3 grep, smoke, graph check
   - [x] Commit — `caa8eac`
-- [ ] **Slice 4 — Write paths (POST / PUT / DELETE) + write-half of `authorization.test.ts` + `employees.test.ts`**
+- [x] **Slice 4 — Write paths (POST / PUT / DELETE) + write-half of `authorization.test.ts` + `employees.test.ts`** — committed `0f06f35`
   - [x] `POST /api/employees` — `canCreate`, sequence id, Employee + User in one transaction
   - [x] `PUT /api/employees/:id` — `findScoped` → `updatableFields` → 403 naming denied fields → explicit `data`; User mirror (D-015)
   - [x] `DELETE /api/employees/:id` — `canDelete`, soft delete both rows, self-deactivation 400
@@ -50,8 +50,14 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] `authorization.test.ts` write half (+27, all 6 spec tests now present), `employees.test.ts` (30) — **written, not run**
   - [x] `docs/AUTHORIZATION.md`, D-015; seed count corrected to 16
   - [x] Verified: typecheck, lint, unit 34/34, rule-3 grep, smoke, graph check
-  - [ ] Commit
+  - [x] Commit — `0f06f35`
 - [ ] **Slice 5 — Dashboard stats + complete `openapi.yaml` + Postman collection**
+  - [x] `GET /api/dashboard/stats` — every count/groupBy under `scopeWhere`
+  - [x] `openapi.yaml` complete — 9 documented ops = 9 mounted routes (cross-checked)
+  - [x] `postman/HRMS.postman_collection.json` — 21 requests, 6 mandatory scenarios with assertions
+  - [x] `tests/integration/dashboard.test.ts` (6) — **written, not run**
+  - [x] Verified: typecheck, lint, unit 34/34, greps, route↔spec smoke, graph check
+  - [ ] Commit
 - [ ] **Slice 6 — Frontend scaffold + auth (Login, AuthContext, interceptors, ProtectedRoute, RoleGate)**
 - [ ] **Slice 7 — Dashboard + MyProfile pages**
 - [ ] **Slice 8 — EmployeeList / EmployeeDetail / EmployeeForm**
@@ -59,7 +65,11 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
 
 ## Next
 
-Slice 2 (auth) → 3 (policy + reads) → 4 (writes) → 5 (dashboard, OpenAPI, Postman), continuously, one commit each. Integration tests are written as each slice lands and run the moment `backend/.env.test` exists.
+**Backend code is complete (Slices 0–5).** Two things remain before the frontend:
+1. The user creates `backend/.env` and `backend/.env.test` → run `npx prisma migrate deploy`, `npx prisma db seed`, then `npm test` (34 unit + 110 integration). Fix whatever the first real run surfaces; log it in AI-007.
+2. Start the API (`npm run dev`), open `http://localhost:4000/api/docs`, run the Postman collection.
+
+Then Slice 6 (frontend scaffold + auth).
 
 ## Blockers
 

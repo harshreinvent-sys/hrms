@@ -1,0 +1,241 @@
+{
+  "info": {
+    "name": "HRMS API — authorization scenarios",
+    "_postman_id": "7f3d2c1a-4b5e-4c6d-8e9f-0a1b2c3d4e5f",
+    "description": "Run the folders top to bottom (or use the Collection Runner). Folder 0 logs in as each seed user and stores the tokens in collection variables; folder 1 contains the six mandatory scenarios from the assessment brief (§9) with status-code assertions; folder 2 has the extra checks from CLAUDE.md.\n\nSet `baseUrl` if the API is not on http://localhost:4000.\n\nSeed password for every account: Password@123",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000/api" },
+    { "key": "adminToken", "value": "" },
+    { "key": "managerToken", "value": "" },
+    { "key": "employee1Token", "value": "" },
+    { "key": "createdEmployeeId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Login (run first)",
+      "item": [
+        {
+          "name": "Login as admin@company.com",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('token present', () => pm.expect(body.token).to.be.a('string'));",
+            "pm.test('role is ADMIN', () => pm.expect(body.user.role).to.eql('ADMIN'));",
+            "pm.collectionVariables.set('adminToken', body.token);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@company.com\",\n  \"password\": \"Password@123\"\n}" }
+          }
+        },
+        {
+          "name": "Login as manager@company.com",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('role is MANAGER', () => pm.expect(body.user.role).to.eql('MANAGER'));",
+            "pm.collectionVariables.set('managerToken', body.token);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"manager@company.com\",\n  \"password\": \"Password@123\"\n}" }
+          }
+        },
+        {
+          "name": "Login as employee1@company.com",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('role is EMPLOYEE', () => pm.expect(body.user.role).to.eql('EMPLOYEE'));",
+            "pm.test('employeeId is EMP001', () => pm.expect(body.user.employeeId).to.eql('EMP001'));",
+            "pm.collectionVariables.set('employee1Token', body.token);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"employee1@company.com\",\n  \"password\": \"Password@123\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Mandatory scenarios (spec §9)",
+      "item": [
+        {
+          "name": "Test 1 — employee1 GET /employees/EMP001 → 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('returns EMP001', () => pm.expect(pm.response.json().employee.id).to.eql('EMP001'));"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }], "url": "{{baseUrl}}/employees/EMP001" }
+        },
+        {
+          "name": "Test 2 — employee1 GET /employees/EMP002 → 403",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+            "pm.test('error code FORBIDDEN', () => pm.expect(pm.response.json().error.code).to.eql('FORBIDDEN'));",
+            "pm.test('no employee data leaked', () => pm.expect(pm.response.text()).to.not.include('employee2@company.com'));"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }], "url": "{{baseUrl}}/employees/EMP002" }
+        },
+        {
+          "name": "Test 3 — employee1 POST /employees → 403",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/employees",
+            "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"Should\",\n  \"lastName\": \"Fail\",\n  \"email\": \"should.fail@company.com\",\n  \"department\": \"Engineering\",\n  \"designation\": \"Intern\",\n  \"joiningDate\": \"2026-10-01\",\n  \"password\": \"Welcome@12345\"\n}" }
+          }
+        },
+        {
+          "name": "Test 4 — admin GET /employees/EMP002 → 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('returns EMP002', () => pm.expect(pm.response.json().employee.id).to.eql('EMP002'));"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/employees/EMP002" }
+        },
+        {
+          "name": "Test 5 — admin POST /employees → 201",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "pm.variables.set('uniqueEmail', `postman.${Date.now()}@company.com`);"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.test('server-generated id EMP###', () => pm.expect(body.employee.id).to.match(/^EMP\\d{3,}$/));",
+              "pm.test('Location header set', () => pm.expect(pm.response.headers.get('Location')).to.eql(`/api/employees/${body.employee.id}`));",
+              "pm.collectionVariables.set('createdEmployeeId', body.employee.id);"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/employees",
+            "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"Postman\",\n  \"lastName\": \"Created\",\n  \"email\": \"{{uniqueEmail}}\",\n  \"department\": \"Engineering\",\n  \"designation\": \"QA Engineer\",\n  \"joiningDate\": \"2026-10-01\",\n  \"managerId\": \"EMP010\",\n  \"password\": \"Welcome@12345\"\n}" }
+          }
+        },
+        {
+          "name": "Test 6 — manager GET /employees/EMP003 (outside team) → 403",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{managerToken}}" }], "url": "{{baseUrl}}/employees/EMP003" }
+        }
+      ]
+    },
+    {
+      "name": "2. Additional checks (CLAUDE.md)",
+      "item": [
+        {
+          "name": "manager GET /employees/EMP001 (direct report) → 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{managerToken}}" }], "url": "{{baseUrl}}/employees/EMP001" }
+        },
+        {
+          "name": "employee1 PUT /employees/EMP002 → 403",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] } }],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/employees/EMP002",
+            "body": { "mode": "raw", "raw": "{ \"phone\": \"+91-00000-00000\" }" }
+          }
+        },
+        {
+          "name": "employee1 PUT own role → 403 naming the field",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+            "pm.test('details name role', () => pm.expect(pm.response.json().error.details[0].path).to.eql('role'));"
+          ] } }],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/employees/EMP001",
+            "body": { "mode": "raw", "raw": "{ \"role\": \"ADMIN\" }" }
+          }
+        },
+        {
+          "name": "employee1 PUT own phone → 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/employees/EMP001",
+            "body": { "mode": "raw", "raw": "{ \"phone\": \"+91-98450-00001\" }" }
+          }
+        },
+        {
+          "name": "employee1 GET /employees → only own record",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('exactly one item, EMP001', () => { pm.expect(body.items).to.have.length(1); pm.expect(body.items[0].id).to.eql('EMP001'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }], "url": "{{baseUrl}}/employees" }
+        },
+        {
+          "name": "manager GET /employees → self + team",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const ids = pm.response.json().items.map(e => e.id);",
+            "pm.test('contains EMP010, EMP001, EMP002', () => pm.expect(ids).to.include.members(['EMP010','EMP001','EMP002']));",
+            "pm.test('does not contain EMP003', () => pm.expect(ids).to.not.include('EMP003'));"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{managerToken}}" }], "url": "{{baseUrl}}/employees" }
+        },
+        {
+          "name": "GET /me as employee1",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('is EMP001', () => pm.expect(pm.response.json().employee.id).to.eql('EMP001'));"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }], "url": "{{baseUrl}}/me" }
+        },
+        {
+          "name": "GET /dashboard/stats as employee1 → 1 / 1",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('sees only themself', () => { pm.expect(body.total).to.eql(1); pm.expect(body.active).to.eql(1); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }], "url": "{{baseUrl}}/dashboard/stats" }
+        },
+        {
+          "name": "No token → 401",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/employees" }
+        },
+        {
+          "name": "Tampered token → 401",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}x" }], "url": "{{baseUrl}}/employees" }
+        },
+        {
+          "name": "admin DELETE created employee → 204 (soft)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"] } }],
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/employees/{{createdEmployeeId}}" }
+        },
+        {
+          "name": "admin GET deleted employee → 200, status INACTIVE",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK — row kept', () => pm.response.to.have.status(200));",
+            "pm.test('INACTIVE', () => pm.expect(pm.response.json().employee.status).to.eql('INACTIVE'));"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/employees/{{createdEmployeeId}}" }
+        }
+      ]
+    }
+  ]
+}
