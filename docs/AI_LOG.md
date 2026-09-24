@@ -252,3 +252,22 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 - Frontend: `npm run build` clean; `npm run lint` clean, zero warnings.
 - Not done by Claude: running the Postman collection (requires the Postman app). The same six scenarios pass in Jest and were exercised through Swagger/the UI during earlier slices.
 **Commit:** suggested — `docs: README with setup, test users, API docs and authorization scenarios`
+
+## AI-013 — UI re-composition: components that make the pages read as a product (2026-09-24)
+**Prompt (summary):** User: "change ui looking aish fix it add some components" — read as *AI-ish*. Looked at every page at 1280 px before touching anything; the diagnosis was emptiness, not palette: text and hairlines on one flat plane, nobody has a face, nothing is grouped, the login is a lone form in a void. Offered three scopes; user chose "All of it".
+**Generated:**
+- New components: `Monogram` (initials on a department-tinted square; tint in `lib/tint.ts`), `Panel` (bordered surface with a titled header bar), `StatStrip` (figures as one ruled strip under a heavy ink rule), `KeyValue`/`KeyValueList`, `Skeleton` + `SkeletonRows` + `SkeletonStats`, `Toast` + `ToastProvider` + `useToast` (quiet bottom-right confirmations, mounted in `main.tsx`), `Breadcrumb`.
+- `pages/Login.tsx` — split layout: a statement panel on `surface-2` ("One register. Every person sees exactly their part of it.") with the three demo roles as monogram rows that **fill the form on click**, and the form on its own surface panel; stacks on phones.
+- `App.tsx` — rail on `surface-2` with sectioned nav (Overview / People / You), register count in the nav, "At a glance" block (active, departments) for ADMIN/MANAGER, user block with monogram; the Menu button reads Close when open.
+- `pages/Dashboard.tsx` — `StatStrip` (+ departments count), then a 3:2 grid: By department (rows link to the filtered register) and **Reporting lines** (managers with their reports as monogram chips; for an employee, "Your manager"), against **Recent joiners** and **Inactive accounts**. One scoped `listEmployees({ limit: 100 })` feeds all three people panels.
+- `pages/EmployeeList.tsx` — summary strip (people · active · inactive · departments, plus "N matching · clear filters" when filtered), filters in a panel, monogram + name as the first column, skeleton rows while loading.
+- `pages/EmployeeDetail.tsx` — breadcrumb, monogram header with status/role, three panels (Contact / Position / Access), side panels **Direct reports** (derived from the scoped list) and **Manager** (as a card when in view). Toast on deactivate.
+- `pages/EmployeeForm.tsx` — breadcrumb, sections as panels, toast on create/save. `pages/MyProfile.tsx` — same treatment; toast on save.
+- Removed: `PageHeader` usage on the four record pages (kept for Dashboard/List).
+**Issues found:**
+- `tintFor` exported from `Monogram.tsx` tripped oxlint's fast-refresh rule; moved to `lib/tint.ts`.
+- First screenshot batch on the new tab failed because the tab was blank — a page must be loaded before `resize_window`. Re-ordered.
+- Console showed `ERR_NETWORK_IO_SUSPENDED` twice — the browser pausing a background tab, not the app.
+**Human corrections:** The whole slice is a correction: the previous UI met the palette brief but still looked generated. User chose the full scope.
+**Verification:** `npm run build` clean; `npm run lint` clean, zero warnings. Browser pane, 1280×900, signed in as admin: dashboard (strip, panels, 7 + 3 reporting lines, recent joiners, inactive list), register (summary strip, monograms, filter panel), `EMP010` detail (breadcrumb, monogram header, three panels, **Direct reports · 3**, Manager card). Login at 1280 (split) and 375 (stacked; `scrollWidth === innerWidth`). Dashboard at 375: no overflow, 4 panels, 31 monograms rendered. No app console errors.
+**Commit:** suggested — `feat(frontend): components and page re-composition — monograms, panels, stat strip, toasts`

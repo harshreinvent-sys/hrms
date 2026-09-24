@@ -7,7 +7,9 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { createEmployee, getEmployee, listEmployees, updateEmployee } from '../api/employees';
 import { toApiError } from '../api/client';
 import { useAuth } from '../auth/useAuth';
-import { PageHeader } from '../components/PageHeader';
+import { Panel } from '../components/Panel';
+import { Breadcrumb } from '../components/Breadcrumb';
+import { useToast } from '../components/useToast';
 import { Button } from '../components/Button';
 import { Spinner } from '../components/Spinner';
 import { ErrorBanner } from '../components/ErrorBanner';
@@ -63,8 +65,9 @@ export function EmployeeFormPage() {
   if (!isCreate && existing.isError) {
     return (
       <>
-        <PageHeader eyebrow="Edit" title="Could not load" />
-        <ErrorBanner error={toApiError(existing.error)} />
+        <Breadcrumb items={[{ label: 'Register', to: '/employees' }, { label: id ?? '', mono: true }, { label: 'Edit' }]} />
+        <h1 className="text-[28px]">Could not load</h1>
+        <div className="mt-4 max-w-xl"><ErrorBanner error={toApiError(existing.error)} /></div>
         <p className="mt-4 text-[14px]"><Link to="/employees" className="underline underline-offset-2">← Back to the register</Link></p>
       </>
     );
@@ -77,6 +80,7 @@ function EmployeeFormInner({ employee }: { employee?: Employee }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [apiError, setApiError] = useState<ApiError | null>(null);
   const isCreate = !employee;
 
@@ -141,6 +145,7 @@ function EmployeeFormInner({ employee }: { employee?: Employee }) {
         queryClient.invalidateQueries({ queryKey: ['me'] }),
       ]);
       queryClient.setQueryData(['employee', saved.id], saved);
+      toast.push({ tone: 'success', title: isCreate ? `Created ${saved.id}` : 'Changes saved', body: `${saved.firstName} ${saved.lastName}` });
       navigate(`/employees/${saved.id}`, { replace: true });
     },
     onError: (error) => {
@@ -157,25 +162,27 @@ function EmployeeFormInner({ employee }: { employee?: Employee }) {
 
   return (
     <>
-      <PageHeader
-        eyebrow={isCreate ? 'New record' : <span className="num">{employee.id}</span>}
-        title={isCreate ? 'Add employee' : `Edit ${employee.firstName} ${employee.lastName}`}
-        description={isCreate ? 'Creates the employee and their login together. The ID is assigned by the server.' : 'Fields you cannot change for this person are shown but locked.'}
-      />
+      <Breadcrumb items={isCreate ? [{ label: 'Register', to: '/employees' }, { label: 'New employee' }] : [{ label: 'Register', to: '/employees' }, { label: employee.id, to: `/employees/${employee.id}`, mono: true }, { label: 'Edit' }]} />
+      <header className="mb-6 border-b border-rule pb-5">
+        <p className="eyebrow">{isCreate ? 'New record' : 'Edit record'}</p>
+        <h1 className="text-[28px] leading-tight sm:text-[32px]">{isCreate ? 'Add employee' : `${employee.firstName} ${employee.lastName}`}</h1>
+        <p className="mt-1 max-w-prose text-[14px] text-ink-muted">{isCreate ? 'Creates the employee and their login together. The ID is assigned by the server.' : 'Fields you cannot change for this person are shown but locked; the server rejects them regardless.'}</p>
+      </header>
 
-      <form onSubmit={form.handleSubmit((v) => { setApiError(null); mutation.mutate(v); })} noValidate className="max-w-2xl">
+      <form onSubmit={form.handleSubmit((v) => { setApiError(null); mutation.mutate(v); })} noValidate className="max-w-3xl">
         <ErrorBanner error={apiError} title={apiError?.code === 'FORBIDDEN' ? 'The server refused part of this change' : undefined} />
 
-        <fieldset className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <legend className="eyebrow mb-2 sm:col-span-2">Person</legend>
+        <Panel eyebrow="Person" title="Name and contact" className="mt-4">
+          <fieldset className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <TextField label="First name" disabled={!can('firstName')} hint={!can('firstName') ? disabledNote : undefined} error={errors.firstName?.message} {...form.register('firstName')} />
           <TextField label="Last name" disabled={!can('lastName')} hint={!can('lastName') ? disabledNote : undefined} error={errors.lastName?.message} {...form.register('lastName')} />
           <TextField label="Email" type="email" disabled={!can('email')} hint={!can('email') ? disabledNote : isCreate ? 'Also the login email' : 'Changing this changes the login'} error={errors.email?.message} {...form.register('email')} />
           <TextField label="Phone" mono disabled={!can('phone')} hint={!can('phone') ? disabledNote : 'Optional'} error={errors.phone?.message} {...form.register('phone')} />
-        </fieldset>
+          </fieldset>
+        </Panel>
 
-        <fieldset className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <legend className="eyebrow mb-2 sm:col-span-2">Position</legend>
+        <Panel eyebrow="Position" title="Where they sit" className="mt-5">
+          <fieldset className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <TextField label="Department" disabled={!can('department')} hint={!can('department') ? disabledNote : undefined} error={errors.department?.message} {...form.register('department')} />
           <TextField label="Designation" disabled={!can('designation')} hint={!can('designation') ? disabledNote : undefined} error={errors.designation?.message} {...form.register('designation')} />
           <TextField label="Joining date" type="date" mono disabled={!can('joiningDate')} hint={!can('joiningDate') ? disabledNote : undefined} error={errors.joiningDate?.message} {...form.register('joiningDate')} />
@@ -185,10 +192,11 @@ function EmployeeFormInner({ employee }: { employee?: Employee }) {
               <option key={m.id} value={m.id}>{m.firstName} {m.lastName} · {m.id}</option>
             ))}
           </SelectField>
-        </fieldset>
+          </fieldset>
+        </Panel>
 
-        <fieldset className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <legend className="eyebrow mb-2 sm:col-span-2">Access</legend>
+        <Panel eyebrow="Access" title="Account" className="mt-5">
+          <fieldset className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <SelectField label="Role" disabled={!can('role')} hint={!can('role') ? disabledNote : undefined} error={errors.role?.message} {...form.register('role')}>
             <option value="EMPLOYEE">Employee</option>
             <option value="MANAGER">Manager</option>
@@ -201,9 +209,10 @@ function EmployeeFormInner({ employee }: { employee?: Employee }) {
           {isCreate && (
             <TextField label="Initial password" type="password" autoComplete="new-password" hint="At least 10 characters. Share it with the employee securely." error={errors.password?.message} {...form.register('password')} className="sm:col-span-2" />
           )}
-        </fieldset>
+          </fieldset>
+        </Panel>
 
-        <div className="mt-8 flex items-center gap-3 border-t border-rule pt-5">
+        <div className="mt-6 flex items-center gap-3">
           <Button type="submit" variant="primary" loading={mutation.isPending}>{isCreate ? 'Create employee' : 'Save changes'}</Button>
           <Button type="button" variant="quiet" onClick={() => navigate(isCreate ? '/employees' : `/employees/${employee.id}`)}>Cancel</Button>
         </div>

@@ -81,6 +81,7 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] `lib/permissions.ts` mirror of `updatableFields`; `routes.tsx` role-guarded routes
   - [x] Verified in browser: admin create → EMP101 → deactivate; manager form locks 8 of 10 fields; employee redirected from /employees; 375px no overflow
   - [x] Commit — `0d8f1c9`
+- [x] **UI re-composition** (AI-013): 7 new components (Monogram, Panel, StatStrip, KeyValue, Skeleton, Toast, Breadcrumb); login split layout; dashboard with reporting lines / recent joiners; register summary strip; detail with direct reports + manager panels — verified at 1280 and 375
 - [x] **Post-frontend fix — login 500s under load** (AI-011): Prisma pool sized for the remote pooler (`connection_limit=15&pool_timeout=30`); transient DB errors → 503 + `Retry-After`; 12 error-handler unit tests; favicon
 - [x] **Slice 9 — README + final verification pass**
   - [x] `README.md` in the brief's section order; every command and path checked against the repo
