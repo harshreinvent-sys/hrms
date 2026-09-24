@@ -63,6 +63,14 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] Verified: typecheck, lint, unit 34/34, greps, route↔spec smoke, graph check
   - [x] Commit — `fcc39df`
 - [ ] **Slice 6 — Frontend scaffold + auth (Login, AuthContext, interceptors, ProtectedRoute, RoleGate)**
+  - [x] Vite + React 19 + TS scaffold; CLAUDE.md deps; Tailwind 3.4
+  - [x] "Ledger" design system (user-chosen): paper/ink/terracotta, Fraunces + Source Sans 3 + Plex Mono
+  - [x] token store (memory + sessionStorage, `exp` auto-logout), axios interceptors, typed API modules
+  - [x] AuthContext (+ `useAuth`), ProtectedRoute (role-aware), RoleGate
+  - [x] Component set: Button, TextField/SelectField, badges, Spinner, ErrorBanner, EmptyState, PageHeader, Table, Modal
+  - [x] Login page, app shell with role-aware nav
+  - [x] Verified: build, lint, live sign-in in the browser pane, EMPLOYEE nav hides "Employees"
+  - [ ] Commit
 - [ ] **Slice 7 — Dashboard + MyProfile pages**
 - [ ] **Slice 8 — EmployeeList / EmployeeDetail / EmployeeForm**
 - [ ] **Slice 9 — README + final verification pass**
