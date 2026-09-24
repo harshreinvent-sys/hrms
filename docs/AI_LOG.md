@@ -198,3 +198,25 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 **Human corrections:** Palette choice (Ledger). Design constraints: no generic AI look, no black/blue/neon — followed: warm ink instead of black, one muted accent, hairline rules instead of shadows, near-square corners, serif display + mono numerals.
 **Verification:** `npm run build` (`tsc -b && vite build`) — clean. `npm run lint` — exit 0, one warning (placeholder file). Dev server started through the preview tool on :5173. In the browser pane: login page renders in the palette; signed in as employee1 through the form → shell rendered; opened the mobile Menu → nav shows **Dashboard, My profile, Sign out — no "Employees"** for an EMPLOYEE. No console errors.
 **Commit:** suggested — `feat(frontend): scaffold, Ledger design system, auth flow and app shell`
+
+## AI-010 — Slices 7 + 8: dashboard, profile, employee register / detail / form (2026-09-24)
+**Prompt (summary):** Continuation of "now create frontend…". Slices 7 and 8 built together and committed together: `routes.tsx` wires both, so splitting the commit would have produced a Slice 7 commit that did not compile on its own.
+**Generated:**
+- `pages/Dashboard.tsx` — three "figures" (Fraunces numerals over a 2 px ink rule), department register with share % and a thin clay proportion bar; eyebrow/title/note change by role (Whole company / Your team / Your record).
+- `pages/MyProfile.tsx` — definition list of the caller's record; side panel edits `phone` only (RHF + Zod; Save disabled until dirty; "Saved" confirmation; API errors inline).
+- `pages/EmployeeList.tsx` — search (300 ms debounce) + department + status filters held in the URL (`?q&department&status&page`), department options taken from the **scoped** dashboard so a manager only sees their team's departments, pagination, `keepPreviousData` with a fade while refetching, empty state with "Clear filters", clickable rows (keyboard too). Title is "My team" for a MANAGER. "Add employee" behind `RoleGate(ADMIN)`.
+- `pages/EmployeeDetail.tsx` — definition list, Edit (shown when the policy mirror allows any field), Deactivate (ADMIN, not self, only when ACTIVE) with a confirm `Modal`; inactive banner; 403/404 rendered as proper states rather than a blank page; manager rendered as a link for ADMIN only.
+- `pages/EmployeeForm.tsx` — create (ADMIN; includes initial password) and edit. Fields the caller may not change are rendered **disabled with a hint**, not hidden, so the rule is visible. On edit, only dirty *and* permitted fields are sent — an unchanged locked field can never trigger a needless 403. Reports-to options come from the scoped list. Server 403s with `details` surface in the banner with the field names.
+- `lib/permissions.ts` — client mirror of `employeePolicy.updatableFields`, documented as cosmetic.
+- `routes.tsx` — real pages; `/employees/new` behind `ProtectedRoute(ADMIN)`, `/employees/*` behind `ProtectedRoute(ADMIN, MANAGER)`. `PageHeader.eyebrow` widened to `ReactNode` (removed two `as unknown as string` casts I had written first).
+**Issues found:**
+- Two pages initially cast a `<span>` to `string` to satisfy `PageHeader`'s prop type. Fixed the type instead of the call sites.
+- Several browser screenshots timed out because the pane was hidden; switched to `get_page_text`, `read_page` and `javascript_tool` (DOM inspection), which are also more precise for the facts being checked.
+- Observed the dev `public` schema now holds 18 employees: 16 seed + `EMP100` (user, via Swagger) + `EMP101` (this verification). EMP001's designation had been changed by the user. Nothing to fix; noted so the numbers in this entry are not mistaken for a bug.
+**Human corrections:** None in this slice.
+**Verification:** `npm run build` — clean. `npm run lint` (oxlint) — clean, zero warnings. In the browser pane against the running API:
+- employee1: dashboard `1 / 1 / 0`, Engineering 100%; typing `/employees` → redirected to Dashboard.
+- admin: dashboard `17 / 14 / 3`, five departments; register renders (mono IDs, stacked name/email, dot status, role tags); `/employees/EMP001` detail with Edit + Deactivate; edit form pre-filled; **create** via the form → `EMP101` (sequence continues past the user's `EMP100`); **deactivate** via the modal → inactive banner, status Inactive, Deactivate action gone; `/me` renders.
+- manager: register titled "My team" with exactly the four rows in scope; `/employees/EMP001/edit` → DOM check: `department`, `designation` editable; `firstName, lastName, email, phone, joiningDate, managerId, role, status` **LOCKED** — matches `employeePolicy.updatableFields` for a direct report.
+- mobile (375×812 emulation): `document.documentElement.scrollWidth === 375`, no horizontal page overflow; the table scrolls inside its wrapper; 18 rows.
+**Commit:** suggested — `feat(frontend): dashboard, profile, employee register, detail and form`

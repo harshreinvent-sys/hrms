@@ -62,7 +62,7 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] `tests/integration/dashboard.test.ts` (6) — **passing**
   - [x] Verified: typecheck, lint, unit 34/34, greps, route↔spec smoke, graph check
   - [x] Commit — `fcc39df`
-- [ ] **Slice 6 — Frontend scaffold + auth (Login, AuthContext, interceptors, ProtectedRoute, RoleGate)**
+- [x] **Slice 6 — Frontend scaffold + auth (Login, AuthContext, interceptors, ProtectedRoute, RoleGate)** — committed `f397e1e`
   - [x] Vite + React 19 + TS scaffold; CLAUDE.md deps; Tailwind 3.4
   - [x] "Ledger" design system (user-chosen): paper/ink/terracotta, Fraunces + Source Sans 3 + Plex Mono
   - [x] token store (memory + sessionStorage, `exp` auto-logout), axios interceptors, typed API modules
@@ -70,18 +70,24 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] Component set: Button, TextField/SelectField, badges, Spinner, ErrorBanner, EmptyState, PageHeader, Table, Modal
   - [x] Login page, app shell with role-aware nav
   - [x] Verified: build, lint, live sign-in in the browser pane, EMPLOYEE nav hides "Employees"
-  - [ ] Commit
-- [ ] **Slice 7 — Dashboard + MyProfile pages**
+  - [x] Commit — `f397e1e`
+- [ ] **Slice 7 — Dashboard + MyProfile pages** (committed together with Slice 8)
+  - [x] `pages/Dashboard.tsx` — role-scoped figures + department register; verified for employee (1/1/0) and admin
+  - [x] `pages/MyProfile.tsx` — record + phone-only editor
 - [ ] **Slice 8 — EmployeeList / EmployeeDetail / EmployeeForm**
+  - [x] `pages/EmployeeList.tsx` — URL-held search/filters/pagination, scoped department options, RoleGate'd Add
+  - [x] `pages/EmployeeDetail.tsx` — Edit / Deactivate (modal), 403/404 states
+  - [x] `pages/EmployeeForm.tsx` — create + edit; locked fields shown disabled; sends only dirty + permitted fields
+  - [x] `lib/permissions.ts` mirror of `updatableFields`; `routes.tsx` role-guarded routes
+  - [x] Verified in browser: admin create → EMP101 → deactivate; manager form locks 8 of 10 fields; employee redirected from /employees; 375px no overflow
+  - [ ] Commit
 - [ ] **Slice 9 — README + final verification pass**
 
 ## Next
 
-**Backend is complete and verified: 150/150 tests against Supabase; dev server running on :4000 with Swagger at `/api/docs`.**
-
-1. Commit the test-run fixes (AI-008).
-2. User-side: run `postman/HRMS.postman_collection.json` against the running server (Claude cannot drive Postman).
-3. Slice 6 — frontend scaffold + auth.
+1. Commit Slices 7 + 8 (AI-010).
+2. **Slice 9 — README** in the spec's section order (Prerequisites, Installation, Environment variables, Database setup, Backend startup, Frontend startup, Test users, API documentation, Authorization test scenarios), then the final verification pass and `PROGRESS.md` close-out.
+3. User-side: run the Postman collection; open the frontend at `http://localhost:5173`.
 
 ## Blockers
 
