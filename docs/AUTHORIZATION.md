@@ -50,9 +50,9 @@ scopeWhere(actor) → Prisma.EmployeeWhereInput
 | `GET /api/employees` | `where: { AND: [scopeWhere(actor), ...filters] }` — scoping happens in SQL, never in JS; filters can narrow but never widen |
 | `GET /api/employees/:id` | `findFirst({ where: { id, AND: [scopeWhere(actor)] } })` → null: `discloseMissing` ? 404 : 403 → found: `canView` re-asserted |
 | `GET /api/me` | `GET /api/employees/:id` with `id = actor.employeeId` — no user-supplied id at all |
-| `POST /api/employees` | `canCreate` before anything else *(Slice 4)* |
-| `PUT /api/employees/:id` | fetch as above (inherits 403/404) → `updatableFields` → any body key outside the set → **403** with `details: [field]`, before Prisma is touched *(Slice 4)* |
-| `DELETE /api/employees/:id` | `canDelete` → fetch as above → soft delete *(Slice 4)* |
+| `POST /api/employees` | `canCreate` before anything else; then Employee + User created in one transaction |
+| `PUT /api/employees/:id` | fetch as above (inherits 403/404) → `updatableFields` → any body key outside the set → **403** with `details: [field]`, before Prisma is touched; `email`/`status` mirrored onto User (D-015) |
+| `DELETE /api/employees/:id` | `canDelete` → fetch as above → soft delete (Employee.status + User.isActive, one transaction) |
 | `GET /api/dashboard/stats` | every count and `groupBy` carries `scopeWhere(actor)` *(Slice 5)* |
 
 ## Status codes
@@ -65,13 +65,14 @@ scopeWhere(actor) → Prisma.EmployeeWhereInput
 | `MANAGER` / `EMPLOYEE` asks for an id outside their scope — whether or not it exists | **403** (existence is not disclosed; D-005) |
 | Malformed id (`not-an-id`), invalid body, unknown body or query keys | **400** |
 | Duplicate email | **409** |
+| `managerId` missing, equal to the employee, or would create a reporting cycle; admin deactivating their own account; empty `PUT` body | **400** (business rules, not authorization — they do not depend on role) |
 
 The 403 for a forbidden-but-real id and for a nonexistent id have **identical bodies**, so timing aside, the two are indistinguishable to the caller. `tests/integration/authorization.test.ts` asserts this.
 
-## Mass-assignment guard *(Slice 4)*
+## Mass-assignment guard
 
 `PUT` bodies are validated with a `.strict()` Zod schema (unknown keys → 400), then every remaining key is checked against `updatableFields`. The request is rejected wholesale if any key fails — there is no partial application. `req.body` is never passed to Prisma; the service builds an explicit `data` object from the allowed keys only.
 
-## Soft delete *(Slice 4)*
+## Soft delete
 
-`DELETE` sets `Employee.status = INACTIVE` and `User.isActive = false` in one transaction and returns 204. `authenticate` re-reads `User.isActive` on every request, so a deactivated user's still-valid JWT is rejected with 401 on its next call.
+`DELETE` sets `Employee.status = INACTIVE` and `User.isActive = false` in one transaction and returns 204. It is idempotent, and an admin cannot deactivate their own account (400). `authenticate` re-reads `User.isActive` on every request, so a deactivated user's still-valid JWT is rejected with 401 on its next call.

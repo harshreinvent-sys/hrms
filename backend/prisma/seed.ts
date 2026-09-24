@@ -1,9 +1,10 @@
 /**
  * Seed data for development and tests.
  *
- * Five login accounts (password `Password@123`) plus ten non-login employees so
- * the dashboard and filters have something to show. Every Employee gets a User
- * (D-003); the non-login ones get an unpublished random password.
+ * Five login accounts (password `Password@123`) plus eleven non-login employees
+ * (16 rows, EMP000–EMP015) so the dashboard and filters have something to show.
+ * Every Employee gets a User (D-003); the non-login ones get an unpublished
+ * random password.
  *
  * Idempotent: employees upsert on `id`, users upsert on `email`. Re-running
  * resets the five known passwords and re-links managers, so a broken dev DB is

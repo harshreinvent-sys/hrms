@@ -154,10 +154,15 @@ describe('GET /api/employees', () => {
   });
 
   it('admin sees everyone in the seed', async () => {
+    // Other test files may have created employees before this one runs (D-009),
+    // so assert on the seeded ids rather than an exact total.
     const res = await get('/api/employees?limit=100', adminToken);
     expect(res.status).toBe(200);
-    expect(res.body.pagination.total).toBe(15);
-    expect(res.body.items).toHaveLength(15);
+    const ids: string[] = res.body.items.map((e: { id: string }) => e.id);
+    for (const seeded of ['EMP000', 'EMP001', 'EMP002', 'EMP003', 'EMP004', 'EMP005', 'EMP006', 'EMP007', 'EMP008', 'EMP009', 'EMP010', 'EMP011', 'EMP012', 'EMP013', 'EMP014', 'EMP015']) {
+      expect(ids).toContain(seeded);
+    }
+    expect(res.body.pagination.total).toBeGreaterThanOrEqual(16);
   });
 
   it('a filter can narrow but never widen an employee’s scope', async () => {
@@ -184,7 +189,8 @@ describe('GET /api/employees', () => {
   it('admin: status filter', async () => {
     const res = await get('/api/employees?status=INACTIVE&limit=100', adminToken);
     expect(res.status).toBe(200);
-    expect(res.body.pagination.total).toBe(2);
+    const ids: string[] = res.body.items.map((e: { id: string }) => e.id);
+    expect(ids).toEqual(expect.arrayContaining(['EMP012', 'EMP013'])); // the two seeded INACTIVE rows
     for (const item of res.body.items) expect(item.status).toBe('INACTIVE');
   });
 
@@ -199,13 +205,16 @@ describe('GET /api/employees', () => {
 
   it('admin: pagination', async () => {
     const page1 = await get('/api/employees?limit=5&page=1', adminToken);
-    const page3 = await get('/api/employees?limit=5&page=3', adminToken);
+    const total: number = page1.body.pagination.total;
+    const totalPages = Math.ceil(total / 5);
+    const lastPage = await get(`/api/employees?limit=5&page=${totalPages}`, adminToken);
+
     expect(page1.body.items).toHaveLength(5);
-    expect(page1.body.pagination).toEqual({ page: 1, limit: 5, total: 15, totalPages: 3 });
-    expect(page3.body.items).toHaveLength(5);
+    expect(page1.body.pagination).toEqual({ page: 1, limit: 5, total, totalPages });
+    expect(lastPage.body.items.length).toBe(total - 5 * (totalPages - 1));
     const ids1 = page1.body.items.map((e: { id: string }) => e.id);
-    const ids3 = page3.body.items.map((e: { id: string }) => e.id);
-    expect(ids1.some((id: string) => ids3.includes(id))).toBe(false);
+    const idsLast = lastPage.body.items.map((e: { id: string }) => e.id);
+    expect(ids1.some((id: string) => idsLast.includes(id))).toBe(false);
   });
 
   it('rejects unknown query parameters', async () => {
@@ -244,5 +253,301 @@ describe('GET /api/me', () => {
   it('no token → 401', async () => {
     const res = await request(app).get('/api/me');
     expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Writes: POST / PUT / DELETE
+// ---------------------------------------------------------------------------
+
+const validCreateBody = (suffix: string) => ({
+  firstName: 'Test',
+  lastName: `User${suffix}`,
+  email: `authz.${suffix}.${Date.now()}@company.com`,
+  department: 'Engineering',
+  designation: 'QA Engineer',
+  joiningDate: '2026-10-01',
+  managerId: SEED.manager.employeeId,
+  password: 'Welcome@12345',
+});
+
+const put = (path: string, token: string, body: object) =>
+  request(app).put(path).set(bearer(token)).send(body);
+const post = (path: string, token: string, body: object) =>
+  request(app).post(path).set(bearer(token)).send(body);
+const del = (path: string, token: string) => request(app).delete(path).set(bearer(token));
+
+describe('POST /api/employees', () => {
+  it('[Spec Test 3] employee1 creates an employee → 403, nothing created', async () => {
+    const body = validCreateBody('t3');
+    const res = await post('/api/employees', employee1Token, body);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
+    expect(await prisma.employee.findUnique({ where: { email: body.email } })).toBeNull();
+  });
+
+  it('manager creates an employee → 403', async () => {
+    const res = await post('/api/employees', managerToken, validCreateBody('mgr'));
+    expect(res.status).toBe(403);
+  });
+
+  it('[Spec Test 5] admin creates an employee → 201 with a server-generated id and a working login', async () => {
+    const body = validCreateBody('t5');
+    const res = await post('/api/employees', adminToken, body);
+
+    expect(res.status).toBe(201);
+    expect(res.headers.location).toBe(`/api/employees/${res.body.employee.id}`);
+    expect(res.body.employee).toMatchObject({
+      firstName: 'Test',
+      email: body.email,
+      role: 'EMPLOYEE',
+      status: 'ACTIVE',
+      managerId: SEED.manager.employeeId,
+    });
+    expect(res.body.employee.id).toMatch(/^EMP\d{3,}$/);
+    expect(Number(res.body.employee.id.slice(3))).toBeGreaterThanOrEqual(100);
+    expect(JSON.stringify(res.body)).not.toMatch(/password/i);
+
+    // The new login works, and it is scoped like any employee.
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ email: body.email, password: body.password });
+    expect(login.status).toBe(200);
+    const meRes = await get('/api/me', login.body.token);
+    expect(meRes.body.employee.id).toBe(res.body.employee.id);
+    const other = await get(`/api/employees/${SEED.employee1.employeeId}`, login.body.token);
+    expect(other.status).toBe(403);
+
+    // The manager now sees the new report in their team.
+    const asManager = await get(`/api/employees/${res.body.employee.id}`, managerToken);
+    expect(asManager.status).toBe(200);
+  });
+
+  it('no token → 401', async () => {
+    const res = await request(app).post('/api/employees').send(validCreateBody('anon'));
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('PUT /api/employees/:id — object-level', () => {
+  it('employee1 updates employee2 → 403, nothing applied', async () => {
+    const before = await prisma.employee.findUniqueOrThrow({ where: { id: SEED.employee2.employeeId } });
+    const res = await put(`/api/employees/${SEED.employee2.employeeId}`, employee1Token, {
+      phone: '+91-00000-00000',
+    });
+    expect(res.status).toBe(403);
+    const after = await prisma.employee.findUniqueOrThrow({ where: { id: SEED.employee2.employeeId } });
+    expect(after.phone).toBe(before.phone);
+  });
+
+  it('manager updates employee3 (outside team) → 403', async () => {
+    const res = await put(`/api/employees/${SEED.employee3.employeeId}`, managerToken, { designation: 'X' });
+    expect(res.status).toBe(403);
+  });
+
+  it('employee1 updates a nonexistent id → 403 (not 404)', async () => {
+    const res = await put(`/api/employees/${NONEXISTENT_EMPLOYEE_ID}`, employee1Token, {
+      phone: '+91-00000-00000',
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('admin updates a nonexistent id → 404', async () => {
+    const res = await put(`/api/employees/${NONEXISTENT_EMPLOYEE_ID}`, adminToken, {
+      phone: '+91-00000-00000',
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('PUT /api/employees/:id — field-level (mass assignment)', () => {
+  it.each(['role', 'managerId', 'status'] as const)(
+    'employee1 changing own %s → 403 naming the field, nothing applied',
+    async (field) => {
+      const values = { role: 'ADMIN', managerId: SEED.admin.employeeId, status: 'INACTIVE' } as const;
+      const before = await prisma.employee.findUniqueOrThrow({
+        where: { id: SEED.employee1.employeeId },
+        include: { user: true },
+      });
+
+      const res = await put(`/api/employees/${SEED.employee1.employeeId}`, employee1Token, {
+        [field]: values[field],
+      });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.details).toEqual([{ path: field, message: expect.any(String) }]);
+
+      const after = await prisma.employee.findUniqueOrThrow({
+        where: { id: SEED.employee1.employeeId },
+        include: { user: true },
+      });
+      expect(after.managerId).toBe(before.managerId);
+      expect(after.status).toBe(before.status);
+      expect(after.user?.role).toBe(before.user?.role);
+    },
+  );
+
+  it('employee1 mixing an allowed and a forbidden field → 403; the allowed one is NOT applied either', async () => {
+    const before = await prisma.employee.findUniqueOrThrow({ where: { id: SEED.employee1.employeeId } });
+    const res = await put(`/api/employees/${SEED.employee1.employeeId}`, employee1Token, {
+      phone: '+91-99999-99999',
+      role: 'ADMIN',
+    });
+    expect(res.status).toBe(403);
+    expect(res.body.error.details).toEqual([{ path: 'role', message: expect.any(String) }]);
+    const after = await prisma.employee.findUniqueOrThrow({ where: { id: SEED.employee1.employeeId } });
+    expect(after.phone).toBe(before.phone);
+  });
+
+  it('employee1 updates own phone → 200', async () => {
+    const original = (await prisma.employee.findUniqueOrThrow({ where: { id: SEED.employee1.employeeId } })).phone;
+    try {
+      const res = await put(`/api/employees/${SEED.employee1.employeeId}`, employee1Token, {
+        phone: '+91-98450-11111',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.employee.phone).toBe('+91-98450-11111');
+    } finally {
+      await prisma.employee.update({ where: { id: SEED.employee1.employeeId }, data: { phone: original } });
+    }
+  });
+
+  it('manager updates a direct report designation → 200', async () => {
+    const original = (await prisma.employee.findUniqueOrThrow({ where: { id: SEED.employee1.employeeId } }))
+      .designation;
+    try {
+      const res = await put(`/api/employees/${SEED.employee1.employeeId}`, managerToken, {
+        designation: 'Senior Software Engineer',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.employee.designation).toBe('Senior Software Engineer');
+    } finally {
+      await prisma.employee.update({
+        where: { id: SEED.employee1.employeeId },
+        data: { designation: original },
+      });
+    }
+  });
+
+  it('manager updates a direct report phone → 403', async () => {
+    const res = await put(`/api/employees/${SEED.employee1.employeeId}`, managerToken, {
+      phone: '+91-00000-00000',
+    });
+    expect(res.status).toBe(403);
+    expect(res.body.error.details).toEqual([{ path: 'phone', message: expect.any(String) }]);
+  });
+
+  it('manager updates a direct report role → 403', async () => {
+    const res = await put(`/api/employees/${SEED.employee1.employeeId}`, managerToken, { role: 'MANAGER' });
+    expect(res.status).toBe(403);
+  });
+
+  it('manager updates own phone → 200', async () => {
+    const original = (await prisma.employee.findUniqueOrThrow({ where: { id: SEED.manager.employeeId } })).phone;
+    try {
+      const res = await put(`/api/employees/${SEED.manager.employeeId}`, managerToken, {
+        phone: '+91-98450-22222',
+      });
+      expect(res.status).toBe(200);
+    } finally {
+      await prisma.employee.update({ where: { id: SEED.manager.employeeId }, data: { phone: original } });
+    }
+  });
+
+  it('manager updates own designation → 403 (self is phone-only)', async () => {
+    const res = await put(`/api/employees/${SEED.manager.employeeId}`, managerToken, { designation: 'CTO' });
+    expect(res.status).toBe(403);
+  });
+
+  it('admin updates any field on anyone → 200', async () => {
+    const original = await prisma.employee.findUniqueOrThrow({ where: { id: SEED.employee3.employeeId } });
+    try {
+      const res = await put(`/api/employees/${SEED.employee3.employeeId}`, adminToken, {
+        designation: 'Senior Financial Analyst',
+        department: 'Finance',
+        phone: '+91-98450-33333',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.employee.designation).toBe('Senior Financial Analyst');
+    } finally {
+      await prisma.employee.update({
+        where: { id: SEED.employee3.employeeId },
+        data: { designation: original.designation, department: original.department, phone: original.phone },
+      });
+    }
+  });
+});
+
+describe('DELETE /api/employees/:id', () => {
+  it('employee1 deletes employee2 → 403, still ACTIVE', async () => {
+    const res = await del(`/api/employees/${SEED.employee2.employeeId}`, employee1Token);
+    expect(res.status).toBe(403);
+    const row = await prisma.employee.findUniqueOrThrow({
+      where: { id: SEED.employee2.employeeId },
+      include: { user: true },
+    });
+    expect(row.status).toBe('ACTIVE');
+    expect(row.user?.isActive).toBe(true);
+  });
+
+  it('employee1 deletes self → 403 (employees cannot delete anyone)', async () => {
+    const res = await del(`/api/employees/${SEED.employee1.employeeId}`, employee1Token);
+    expect(res.status).toBe(403);
+  });
+
+  it('manager deletes a direct report → 403', async () => {
+    const res = await del(`/api/employees/${SEED.employee1.employeeId}`, managerToken);
+    expect(res.status).toBe(403);
+  });
+
+  it('employee1 deletes a nonexistent id → 403 (not 404)', async () => {
+    const res = await del(`/api/employees/${NONEXISTENT_EMPLOYEE_ID}`, employee1Token);
+    expect(res.status).toBe(403);
+  });
+
+  it('admin deletes a nonexistent id → 404', async () => {
+    const res = await del(`/api/employees/${NONEXISTENT_EMPLOYEE_ID}`, adminToken);
+    expect(res.status).toBe(404);
+  });
+
+  it('admin deletes self → 400', async () => {
+    const res = await del(`/api/employees/${SEED.admin.employeeId}`, adminToken);
+    expect(res.status).toBe(400);
+  });
+
+  it('admin soft-deletes an employee → 204; row kept, INACTIVE; their token and login stop working', async () => {
+    const body = validCreateBody('del');
+    const created = await post('/api/employees', adminToken, body);
+    expect(created.status).toBe(201);
+    const id: string = created.body.employee.id;
+
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ email: body.email, password: body.password });
+    expect(login.status).toBe(200);
+    const victimToken: string = login.body.token;
+
+    const res = await del(`/api/employees/${id}`, adminToken);
+    expect(res.status).toBe(204);
+
+    const row = await prisma.employee.findUniqueOrThrow({ where: { id }, include: { user: true } });
+    expect(row.status).toBe('INACTIVE');
+    expect(row.user?.isActive).toBe(false);
+
+    const asAdmin = await get(`/api/employees/${id}`, adminToken);
+    expect(asAdmin.status).toBe(200);
+    expect(asAdmin.body.employee.status).toBe('INACTIVE');
+
+    const withOldToken = await get('/api/me', victimToken);
+    expect(withOldToken.status).toBe(401);
+
+    const relogin = await request(app)
+      .post('/api/auth/login')
+      .send({ email: body.email, password: body.password });
+    expect(relogin.status).toBe(401);
+
+    // Idempotent.
+    const again = await del(`/api/employees/${id}`, adminToken);
+    expect(again.status).toBe(204);
   });
 });

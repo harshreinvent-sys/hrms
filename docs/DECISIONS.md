@@ -1,6 +1,6 @@
 # Decisions
 
-Format: context → decision → why → trade-off. Claude drafts; the human approves. Next id: **D-015**.
+Format: context → decision → why → trade-off. Claude drafts; the human approves. Next id: **D-016**.
 
 ## D-001 — Rebuild clean in `backend/`, drop out-of-spec modules
 **Context:** An API-only scaffold existed before the assessment brief arrived (flat `src/`, 4 roles, cuid IDs, attendance/leave/org, Vitest, inline authorization).
@@ -81,3 +81,9 @@ Format: context → decision → why → trade-off. Claude drafts; the human app
 **Decision (user-approved 2026-09-24):** Delete them. code-review-graph stays installed; its `.mcp.json` entry and `.claude/` skills remain committed.
 **Why:** An assessment repo is read top-down by a reviewer. Twelve config files for tools the project does not use read as noise.
 **Trade-off:** Re-running `code-review-graph install` would recreate them; nobody should.
+
+## D-015 — `PUT` mirrors `email` and `status` onto the login
+**Context:** `Employee.email` and `User.email` are both unique columns; `Employee.status` and `User.isActive` both express "can this person act". Only ADMIN may change any of them.
+**Decision:** In `update()`, an `email` change also updates `User.email`; a `status` change sets `User.isActive = (status === ACTIVE)`; a `role` change writes `User.role`. All in the same transaction as the employee update.
+**Why:** Otherwise renaming an employee's email leaves their login on the old address, and marking them INACTIVE leaves them able to sign in — the soft-delete path would then be the only one that got it right.
+**Trade-off:** Two tables carry the email. Accepted: the spec lists it on both entities, and the alternative (login by employee id) is worse UX.

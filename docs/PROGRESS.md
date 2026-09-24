@@ -33,7 +33,7 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] `tsconfig.test.json`; `npm run typecheck` covers src + tests + prisma
   - [x] Verified: tsc (both configs), lint, DB-free smoke run, graph check
   - [x] Commit — `8b9755e`
-- [ ] **Slice 3 — `employeePolicy.ts` + read paths + `/me` + `AUTHORIZATION.md` + read-half of `authorization.test.ts`**
+- [x] **Slice 3 — `employeePolicy.ts` + read paths + `/me` + `AUTHORIZATION.md` + read-half of `authorization.test.ts`** — committed `caa8eac`
   - [x] `policies/employeePolicy.ts` — `canView`, `canCreate`, `canDelete`, `discloseMissing`, `updatableFields`, `scopeWhere`
   - [x] `tests/unit/employeePolicy.test.ts` — **34/34 passing** (no DB)
   - [x] `modules/employees` read paths: `GET /api/employees`, `GET /api/employees/:id`; `GET /api/me`
@@ -41,8 +41,16 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] `tests/integration/authorization.test.ts` read half (30 tests) — **written, not run**
   - [x] `docs/AUTHORIZATION.md` matches the policy file
   - [x] Verified: typecheck, lint, unit tests, rule-3 grep, smoke, graph check
-  - [ ] Commit
+  - [x] Commit — `caa8eac`
 - [ ] **Slice 4 — Write paths (POST / PUT / DELETE) + write-half of `authorization.test.ts` + `employees.test.ts`**
+  - [x] `POST /api/employees` — `canCreate`, sequence id, Employee + User in one transaction
+  - [x] `PUT /api/employees/:id` — `findScoped` → `updatableFields` → 403 naming denied fields → explicit `data`; User mirror (D-015)
+  - [x] `DELETE /api/employees/:id` — `canDelete`, soft delete both rows, self-deactivation 400
+  - [x] `openapi.yaml` — write ops with per-role field table
+  - [x] `authorization.test.ts` write half (+27, all 6 spec tests now present), `employees.test.ts` (30) — **written, not run**
+  - [x] `docs/AUTHORIZATION.md`, D-015; seed count corrected to 16
+  - [x] Verified: typecheck, lint, unit 34/34, rule-3 grep, smoke, graph check
+  - [ ] Commit
 - [ ] **Slice 5 — Dashboard stats + complete `openapi.yaml` + Postman collection**
 - [ ] **Slice 6 — Frontend scaffold + auth (Login, AuthContext, interceptors, ProtectedRoute, RoleGate)**
 - [ ] **Slice 7 — Dashboard + MyProfile pages**
