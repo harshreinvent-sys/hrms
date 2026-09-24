@@ -335,3 +335,13 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 **Human corrections:** None; user reported the console errors.
 **Verification:** Live reproduction as above. `npm run typecheck`, `lint` clean; `npm run test:unit` **63/63**. Dry run of `scripts/deploy.cjs` with dummy Render-shaped URLs and `RENDER=1`: logged both descriptions, `Added … pgbouncer=true, connection_limit=15, pool_timeout=30`, derived the session pooler, then refused to start on P1001 for the nonexistent dummy project (correct). Not verified: the live Render service after redeploy — the user's next log confirms.
 **Commit:** suggested — `fix(deploy): add pgbouncer=true to a bare Supabase pooler URL; classify prepared-statement collisions as 503`
+
+## AI-019 — "Is the UI fully mobile responsive?" — measured, one gap fixed (2026-09-25)
+**Prompt (summary):** User asked whether the UI is fully mobile responsive. Honest starting position: only login, dashboard and register had been measured at 375 px; detail, edit, profile and create had not.
+**Method:** The browser pane could not open the Vercel site and the local backend has the changed DB password, so a throwaway stub API (in the scratchpad, not the repo) served the seed data with real signed JWTs; `frontend/.env` was pointed at it for the session and restored afterwards. Each screen was measured with `documentElement.scrollWidth` vs `innerWidth` plus a scan for any element whose right edge exceeds the viewport.
+**Findings at 375×812:** dashboard, detail, edit, profile, create, login — page width 375, nothing past the right edge, forms single-column, panels stacked. Register: page width 375 but the seven-column table scrolled sideways inside its wrapper — technically no overflow, practically a poor phone experience.
+**Generated / changed:** `frontend/src/pages/EmployeeList.tsx` — below `sm` the register renders one card per person (monogram, name, id, designation · department, status, role, manager); the table is `hidden sm:block`. Verified: at 375 px 16 cards visible / table hidden; at 900 px table visible / cards hidden.
+**Issues found:** None beyond the register's sideways table. Local backend answered 503 (`SERVICE_UNAVAILABLE`) to a login — the P1000 mapping from AI-016 working as intended; the local `.env` still needs the new password.
+**Human corrections:** None.
+**Verification:** `npm run build`, `npm run lint` clean. Measurements as above on all six screens. Cleanup: `.env` restored from backup, stub stopped, frontend dev server restarted on the real API.
+**Commit:** suggested — `feat(frontend): card layout for the register below the sm breakpoint`

@@ -127,7 +127,31 @@ export function EmployeeListPage() {
 
       {employees.data && employees.data.items.length > 0 && (
         <>
-          <Table className={`bg-surface ${employees.isFetching ? 'opacity-60' : ''} transition-opacity`}>
+          {/* Phone: one card per person. A seven-column table has no honest
+              phone layout; sideways scrolling hides most of each row. */}
+          <ul className={`divide-y divide-rule border-y border-rule bg-surface sm:hidden ${employees.isFetching ? 'opacity-60' : ''} transition-opacity`}>
+            {employees.data.items.map((e) => (
+              <li key={e.id}>
+                <button type="button" onClick={() => navigate(`/employees/${e.id}`)} className="flex w-full items-start gap-3 px-3 py-3 text-left hover:bg-surface-2 focus-visible:bg-surface-2">
+                  <Monogram firstName={e.firstName} lastName={e.lastName} department={e.department} size="lg" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="truncate font-medium">{e.firstName} {e.lastName}</span>
+                      <span className="num shrink-0 text-[12px] text-ink-faint">{e.id}</span>
+                    </span>
+                    <span className="block truncate text-[13px] text-ink-muted">{e.designation} · {e.department}</span>
+                    <span className="mt-1.5 flex items-center gap-3">
+                      <StatusBadge status={e.status} />
+                      <RoleBadge role={e.role} />
+                      {e.manager && <span className="truncate text-[12px] text-ink-faint">→ {e.manager.name}</span>}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <Table className={`hidden bg-surface sm:block ${employees.isFetching ? 'opacity-60' : ''} transition-opacity`}>
             <thead>
               <tr>
                 <Th>Person</Th>
