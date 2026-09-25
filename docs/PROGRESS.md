@@ -91,6 +91,7 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
 - [x] **Phone validation** (AI-022, D-020): exactly ten digits on `POST`/`PUT` (Zod + OpenAPI), `PhoneField` strips non-digits and pasted `+91`/`0` prefixes, seed/tests/Postman on ten-digit values — verified in browser on `/me` and `/employees/new`
 - [x] **Catalog + org rules** (AI-023, D-021): department/designation dropdowns backed by a closed list on the API; manager required unless ADMIN (create refine + update effective check); letters-only names; human field labels in hints and error details, hint hidden for ADMIN; Register nav no longer active on Add employee — 38 new unit tests, 101/101
 - [x] **Recent joiners for every role** (AI-024, D-022): `GET /api/dashboard/recent-joiners` — company-wide, reduced projection, predicate in the policy file; +2 unit, +6 integration tests; dashboard panel reads it
+- [x] **Reporting lines name out-of-scope managers** (AI-025): uses the manager summary already on every employee row; no API change
 
 ## Next
 

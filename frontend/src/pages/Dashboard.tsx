@@ -58,7 +58,14 @@ export function DashboardPage() {
       groups.get(e.managerId)!.push(e);
     }
     return [...groups.entries()]
-      .map(([managerId, reports]) => ({ manager: byId.get(managerId) ?? null, managerId, reports }))
+      .map(([managerId, reports]) => ({
+        manager: byId.get(managerId) ?? null,
+        managerId,
+        // A manager outside the caller's scope (e.g. the manager's own manager) is
+        // not in the list, but every report's record names them (manager summary).
+        managerName: reports.find((r) => r.manager)?.manager?.name ?? null,
+        reports,
+      }))
       .sort((a, b) => b.reports.length - a.reports.length);
   }, [people.data]);
 
@@ -102,7 +109,7 @@ export function DashboardPage() {
               <div className="p-4"><EmptyState title="No reporting lines in view">{role === 'EMPLOYEE' ? 'Your manager is shown on your profile.' : 'Nobody in view reports to anyone else in view.'}</EmptyState></div>
             ) : (
               <ul className="divide-y divide-rule">
-                {reportingLines.map(({ manager, managerId, reports }) => (
+                {reportingLines.map(({ manager, managerId, managerName, reports }) => (
                   <li key={managerId} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
                     <div className="flex min-w-0 items-center gap-3 sm:w-64">
                       {manager ? (
@@ -111,6 +118,14 @@ export function DashboardPage() {
                           <div className="min-w-0">
                             <p className="truncate text-[14px] font-semibold">{manager.firstName} {manager.lastName}</p>
                             <p className="truncate text-[12px] text-ink-muted">{manager.designation}</p>
+                          </div>
+                        </>
+                      ) : managerName ? (
+                        <>
+                          <Monogram firstName={managerName.split(' ')[0] ?? ''} lastName={managerName.split(' ').slice(1).join(' ') || managerName} size="md" />
+                          <div className="min-w-0">
+                            <p className="truncate text-[14px] font-semibold">{managerName}</p>
+                            <p className="num text-[12px] text-ink-muted">{managerId}</p>
                           </div>
                         </>
                       ) : (
