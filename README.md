@@ -227,7 +227,7 @@ If you configure the services by hand instead, the two things that matter:
 
 The health check is `GET /health`.
 
-**Cold starts.** Render's free tier stops the API after ~15 idle minutes; the first request afterwards can take up to a minute. The frontend handles this: on page load it pings `/health` so the server starts booting immediately, and the API client retries cold-start failures (no response, or a 502/503/504 that is not the API's own error body) up to **3 attempts** with 4 s and 10 s pauses — only for requests that are safe to repeat (GETs and the login POST; never a create, update or delete). While retrying, the login page and the session check show *"Waking the server — attempt n of 3"*. See `frontend/src/api/client.ts`.
+**Cold starts.** Render's free tier stops the API after ~15 idle minutes; the first request afterwards can take up to a minute. The frontend handles this: on page load it pings `/health` so the server starts booting immediately, and the API client retries cold-start failures (no response, or a 502/503/504 that is not the API's own error body) up to **3 attempts** with 4 s and 10 s pauses, on **every route**. Writes are safe to repeat here: a platform 502/503 means the request never reached the app; on a timeout, `PUT` reapplies the same data, `DELETE` is a soft delete, and a repeated `POST /employees` is rejected by the unique email (409) rather than duplicated. While retrying, every page shows *"Waking the server — attempt n of 3"* (login page, session check, and the app shell). See `frontend/src/api/client.ts`.
 
 ### Frontend on Vercel (instead of Render's static site)
 

@@ -359,3 +359,17 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 **Human corrections:** None; user specified the behaviour.
 **Verification:** `npm run build`, `npm run lint` clean. Local simulation with a throwaway "sleeping Render" stub (scratchpad, not the repo) returning 503 HTML for the first 3 requests: stub log shows `/health` 503 (warm-up), `POST /api/auth/login` 503, 503, then serving; in the browser at 1.5 s the notice read "attempt 2 of 3" with the button "Waiting for the server…", at ~6 s "attempt 3 of 3", at ~17 s the dashboard rendered. Cleanup: stub killed, `frontend/.env` restored, dev server restarted on the real API. Not verified: against the live Render service (its sleep cannot be forced on demand).
 **Commit:** suggested — `feat(frontend): retry cold-start failures with a visible "waking the server" notice`
+
+## AI-021 — Cold-start retries on every route, writes included (2026-09-25)
+**Prompt (summary):** User: "do this on all the routes" — extend the cold-start retry from GETs + login to every request.
+**Generated / changed:**
+- `frontend/src/api/client.ts` — the `isSafeToRetry` gate is removed; every method retries under the same cold-start rules (no response, or a platform 502/503/504 without the API's own error body). New `hrms:awake` event fires when a retried request settles (success or final failure) so notices clear themselves. Header comment records why retrying writes is acceptable for this API (D-019).
+- `components/useServerWaking.ts` — clears on `hrms:awake`.
+- `App.tsx` — the "Waking the server" notice now renders in the shell above the routed page, so a write on any page shows progress without each page wiring it.
+- README paragraph; `docs/DECISIONS.md` D-019 (amends D-018) — the idempotency argument per write: platform 5xx never reached the app; `PUT` reapplies the same data; `DELETE` is a soft delete; logout is stateless; a repeated `POST /employees` returns 409 on the unique email rather than a second row. Trade-off named: a create that times out then succeeds surfaces as "email already exists" — visible and recoverable, not silent duplication. Any future non-idempotent write must opt out or carry an idempotency key.
+**Issues found:**
+- None in this change. Observed in the simulator log (dev only): the `/me` page issues `GET /api/me` three times on load — AuthContext's session re-validation is called directly rather than through the shared `['me']` query, and React StrictMode double-runs the effect in development. Production sends one fewer. Noted for a later cleanup; no behaviour impact.
+- The Phone input's accessible name resolves to its placeholder in the accessibility tree rather than the "Phone" label; harmless but worth checking `TextField`'s `htmlFor`/`id` pairing later.
+**Human corrections:** User widened the scope from "login" to "all routes"; the D-018 restriction was reversed with the reasoning recorded.
+**Verification:** `npm run build`, `npm run lint` clean; `isSafeToRetry` no longer present. Simulator (scratchpad) configured to 503 only `PUT /api/employees/*` twice: log shows PUT 503 at 09:44:58, 503 at :45:02 (+4 s), served at :45:12 (+10 s); all reads served normally. Browser: notice "attempt 2 of 3" at 1.5 s and "attempt 3 of 3" at ~6 s in the app shell on `/me`; then the "Phone updated" toast, notice gone, new number on the page. Cleanup: stub killed, `frontend/.env` restored, dev server restarted on the real API.
+**Commit:** suggested — `feat(frontend): cold-start retries on every route; waking notice in the shell`

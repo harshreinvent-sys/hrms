@@ -21,13 +21,19 @@ function resolveBaseUrl(): string {
 const BASE_URL = resolveBaseUrl();
 
 // ---------------------------------------------------------------------------
-// Cold-start tolerance
+// Cold-start tolerance — every route
 //
 // Free-tier hosting (Render) spins the API down after idle minutes; the first
 // request afterwards hangs for 30–60 s while it boots, or gets a 502/503 from
-// the platform's edge. Those are retried with a pause. Everything else — 4xx,
-// and any 5xx that carries our own { error: { code } } body (the API is up,
-// it just failed) — is returned at once.
+// the platform's edge. Those are retried with a pause, for every method.
+// Everything else — 4xx, and any 5xx that carries our own { error: { code } }
+// body (the API is up, it just failed) — is returned at once.
+//
+// Why retrying writes is acceptable for THIS API (D-019): a platform 502/503
+// means the request never reached the app, so any method is safe; on a
+// timeout, PUT reapplies the same data, DELETE is a soft delete (204 twice),
+// logout is stateless, and a repeated POST /employees is rejected by the
+// unique email (409) rather than creating a second record.
 // ---------------------------------------------------------------------------
 
 /** Total attempts, including the first. */
@@ -39,16 +45,10 @@ const ATTEMPT_TIMEOUT_MS = 40_000;
 
 /** Fired on window before each retry: `detail = { attempt, max, delayMs }`. */
 export const SERVER_WAKING_EVENT = 'hrms:waking';
+/** Fired once a retried request settles (success or final failure). */
+export const SERVER_AWAKE_EVENT = 'hrms:awake';
 
 type RetryConfig = AxiosRequestConfig & { __attempt?: number };
-
-const RETRYABLE_METHODS = new Set(['get', 'head', 'options']);
-
-/** Only requests whose repetition cannot change data. Login has no side effects. */
-function isSafeToRetry(config: RetryConfig): boolean {
-  const method = (config.method ?? 'get').toLowerCase();
-  return RETRYABLE_METHODS.has(method) || /\/auth\/login$/.test(config.url ?? '');
-}
 
 function isColdStartFailure(error: AxiosError): boolean {
   if (!error.response) return true; // network error or timeout
@@ -72,8 +72,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+const settled = () => window.dispatchEvent(new Event(SERVER_AWAKE_EVENT));
+
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if ((response.config as RetryConfig).__attempt) settled();
+    return response;
+  },
   async (error: AxiosError) => {
     const config = (error.config ?? {}) as RetryConfig;
 
@@ -88,7 +93,7 @@ api.interceptors.response.use(
     }
 
     const attempt = config.__attempt ?? 1;
-    if (attempt < MAX_ATTEMPTS && isSafeToRetry(config) && isColdStartFailure(error)) {
+    if (attempt < MAX_ATTEMPTS && isColdStartFailure(error)) {
       const delayMs = RETRY_DELAYS_MS[attempt - 1] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]!;
       window.dispatchEvent(
         new CustomEvent(SERVER_WAKING_EVENT, { detail: { attempt: attempt + 1, max: MAX_ATTEMPTS, delayMs } }),
@@ -97,6 +102,7 @@ api.interceptors.response.use(
       return api.request({ ...config, __attempt: attempt + 1 } as RetryConfig);
     }
 
+    if (config.__attempt) settled();
     return Promise.reject(error);
   },
 );

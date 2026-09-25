@@ -1,6 +1,6 @@
 # Decisions
 
-Format: context → decision → why → trade-off. Claude drafts; the human approves. Next id: **D-019**.
+Format: context → decision → why → trade-off. Claude drafts; the human approves. Next id: **D-020**.
 
 ## D-001 — Rebuild clean in `backend/`, drop out-of-spec modules
 **Context:** An API-only scaffold existed before the assessment brief arrived (flat `src/`, 4 roles, cuid IDs, attendance/leave/org, Vitest, inline authorization).
@@ -105,3 +105,9 @@ Format: context → decision → why → trade-off. Claude drafts; the human app
 **Decision:** The axios client retries up to 3 attempts total (pauses 4 s, 10 s; 40 s timeout per attempt) when the failure looks like a sleeping platform: no response at all, or a 502/503/504 **without** the API's `{ error: { code } }` body. Only idempotent requests retry — GET/HEAD/OPTIONS and `POST /auth/login` (no side effects). Creates, updates and deletes never retry automatically. A `hrms:waking` event drives a visible "attempt n of 3" notice. On load the app pings `/health` (outside the retrying client) to start the boot early.
 **Why:** Distinguishing platform 5xx from the API's own 503 (which carries our JSON shape) means a genuinely failing API is reported immediately instead of after three waits. Excluding writes prevents a slow `POST /employees` from creating two employees.
 **Trade-off:** Worst case before the user sees an error is ~2 minutes (3 × 40 s + 14 s of pauses). Acceptable given the visible progress notice.
+
+## D-019 — Cold-start retries apply to every route, writes included (amends D-018)
+**Context:** D-018 limited retries to GETs and login to avoid duplicating a write whose first attempt timed out but succeeded. User asked for the behaviour on all routes.
+**Decision:** Retry every method under the same cold-start rules (no response, or platform 502/503/504 without the API's error body; 3 attempts; 4 s / 10 s pauses). The "waking" notice moves into the app shell so it appears on any page.
+**Why:** For this API the duplicate-write risk is already contained: a platform 502/503 never reached the app; `PUT` is idempotent (same data, same result); `DELETE` is a soft delete answering 204 twice; logout is stateless; a repeated `POST /employees` hits the unique email and returns 409 instead of a second row. A user's create can therefore surface as "email already exists" in the rare timeout-then-success case — a visible, recoverable outcome rather than silent duplication.
+**Trade-off:** That 409 edge exists. If a non-idempotent write is ever added (e.g. "send offer letter"), it must opt out of retries or carry an idempotency key.

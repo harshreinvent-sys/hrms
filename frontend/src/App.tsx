@@ -5,6 +5,8 @@ import { useAuth } from './auth/useAuth';
 import { fetchDashboardStats } from './api/dashboard';
 import { RoleBadge } from './components/Badge';
 import { Monogram } from './components/Monogram';
+import { WakingNotice } from './components/WakingNotice';
+import { useServerWaking } from './components/useServerWaking';
 
 /**
  * Application shell: a rail on wide screens, a top bar with a Menu on phones.
@@ -16,6 +18,9 @@ export function AppShell() {
   const navigate = useNavigate();
   const [signingOut, setSigningOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Any request on any page may be the one that wakes a sleeping server; the
+  // notice lives in the shell so the page in view does not have to know.
+  const { waking } = useServerWaking();
   // Same query key as the dashboard, so this costs nothing extra once that page has loaded.
   const stats = useQuery({ queryKey: ['dashboard'], queryFn: fetchDashboardStats, enabled: !!user });
 
@@ -111,6 +116,7 @@ export function AppShell() {
 
       <main className="min-w-0 px-4 py-6 sm:px-8 sm:py-8">
         <div className="mx-auto max-w-content">
+          {waking && <div className="mb-5"><WakingNotice waking={waking} /></div>}
           <Outlet />
         </div>
       </main>
