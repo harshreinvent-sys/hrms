@@ -70,6 +70,17 @@ export interface CreateEmployeeInput {
 
 export type UpdateEmployeeInput = Partial<Omit<CreateEmployeeInput, 'password'>>;
 
+/** Company-wide welcome list, the same for every role (D-022). Nothing beyond these fields is disclosed. */
+export interface RecentJoiner {
+  id: string;
+  firstName: string;
+  lastName: string;
+  department: string;
+  designation: string;
+  /** YYYY-MM-DD */
+  joiningDate: string;
+}
+
 export interface DashboardStats {
   total: number;
   active: number;

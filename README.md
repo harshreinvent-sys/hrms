@@ -161,6 +161,7 @@ All under `/api`; all require `Authorization: Bearer <token>` except login and d
 | `PUT` | `/employees/{id}` | per field | Partial update. Any submitted field the caller may not change → **403 naming it**, nothing applied. |
 | `DELETE` | `/employees/{id}` | ADMIN | 204, **soft** delete: `status = INACTIVE` and the login disabled. |
 | `GET` | `/dashboard/stats` | any role | `{ total, active, inactive, byDepartment[] }`, scoped like the list. |
+| `GET` | `/dashboard/recent-joiners` | any role | `{ items[] }` — the newest active joiners, **company-wide and identical for every role** (the one deliberate exception to scoping, D-022). Reduced to name, department, designation and joining date. `?limit=` 1–20, default 5. |
 
 Error body everywhere: `{ "error": { "code", "message", "details"? } }`.
 
@@ -279,7 +280,7 @@ frontend/src/
 
 ## Design notes worth knowing
 
-- **One policy file.** `canView`, `canCreate`, `canDelete`, `discloseMissing`, `updatableFields`, `scopeWhere` are pure functions over `{ employeeId, role }` and `{ id, managerId }`. Services call them before touching Prisma; lists and the dashboard AND the policy's `where` fragment into the SQL rather than filtering in JavaScript.
+- **One policy file.** `canView`, `canCreate`, `canDelete`, `discloseMissing`, `updatableFields`, `scopeWhere` (and the one deliberate exception, `recentJoinersWhere`, D-022) are pure functions over `{ employeeId, role }` and `{ id, managerId }`. Services call them before touching Prisma; lists and the dashboard AND the policy's `where` fragment into the SQL rather than filtering in JavaScript.
 - **Mass assignment.** `PUT` bodies are `.strict()` (unknown keys → 400), then every key is checked against `updatableFields`; the request is rejected wholesale if any fails. `req.body` never reaches Prisma.
 - **Soft delete.** `DELETE` keeps the row, sets `INACTIVE`, disables the login; a live token stops working on its next request. An admin cannot deactivate themself (400).
 - **Passwords.** bcrypt, cost 12. Login compares against a real dummy hash when the email is unknown so timing does not reveal existence.

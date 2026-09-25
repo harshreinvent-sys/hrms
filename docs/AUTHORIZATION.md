@@ -14,6 +14,8 @@ Every authorization decision is a pure function in `employeePolicy.ts`. Nothing 
 | `MANAGER` | self + direct reports | no | no | self: `phone` · direct report: `designation`, `department` |
 | `EMPLOYEE` | self only | no | no | self: `phone` |
 
+Plus one deliberate exception for every role: the dashboard's **recent joiners** list is company-wide and identical for everyone, reduced to name, department, designation and joining date (D-022, `recentJoinersWhere`).
+
 "Direct report" is one level: `target.managerId === actor.employeeId`. A manager does not see their reports' reports.
 
 ## Policy functions
@@ -41,6 +43,11 @@ scopeWhere(actor) → Prisma.EmployeeWhereInput
   ADMIN    → {}
   MANAGER  → { OR: [ { id: actor.employeeId }, { managerId: actor.employeeId } ] }
   EMPLOYEE → { id: actor.employeeId }
+
+recentJoinersWhere(actor) → Prisma.EmployeeWhereInput          (D-022 — the one deliberate exception)
+  every role → { status: ACTIVE }
+  Used only by GET /api/dashboard/recent-joiners, whose projection is id, firstName, lastName,
+  department, designation, joiningDate — never email, phone, manager, role or status.
 ```
 
 ## How each endpoint uses them
@@ -54,6 +61,7 @@ scopeWhere(actor) → Prisma.EmployeeWhereInput
 | `PUT /api/employees/:id` | fetch as above (inherits 403/404) → `updatableFields` → any body key outside the set → **403** with `details: [field]`, before Prisma is touched; `email`/`status` mirrored onto User (D-015) |
 | `DELETE /api/employees/:id` | `canDelete` → fetch as above → soft delete (Employee.status + User.isActive, one transaction) |
 | `GET /api/dashboard/stats` | every count and the department `groupBy` carry `scopeWhere(actor)` — the dashboard can never show more than the list |
+| `GET /api/dashboard/recent-joiners` | `recentJoinersWhere(actor)` — company-wide, identical rows for every role, reduced projection (D-022). Discloses nothing that unlocks the scoped endpoints: an EMPLOYEE who sees a joiner here still gets 403 on `GET /api/employees/:id` for them |
 
 ## Status codes
 

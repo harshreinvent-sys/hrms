@@ -99,3 +99,66 @@ describe('GET /api/dashboard/stats', () => {
     expect(departments).not.toContain('Finance');
   });
 });
+
+describe('GET /api/dashboard/recent-joiners (D-022 — company-wide, identical for every role)', () => {
+  const recent = (token: string, query = '') => request(app).get(`/api/dashboard/recent-joiners${query}`).set(bearer(token));
+
+  it('no token → 401', async () => {
+    const res = await request(app).get('/api/dashboard/recent-joiners');
+    expect(res.status).toBe(401);
+  });
+
+  it('every role receives exactly the same rows', async () => {
+    const [admin, manager, employee] = await Promise.all([
+      recent(await loginAs('admin')),
+      recent(await loginAs('manager')),
+      recent(await loginAs('employee1')),
+    ]);
+    expect(admin.status).toBe(200);
+    expect(manager.body).toEqual(admin.body);
+    expect(employee.body).toEqual(admin.body);
+    expect(employee.body.items.length).toBe(5);
+  });
+
+  it('is newest-first, ACTIVE only, and matches the database', async () => {
+    const res = await recent(await loginAs('employee1'), '?limit=20');
+    expect(res.status).toBe(200);
+    const expected = await prisma.employee.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true },
+      orderBy: [{ joiningDate: 'desc' }, { id: 'desc' }],
+      take: 20,
+    });
+    expect(res.body.items.map((e: { id: string }) => e.id)).toEqual(expected.map((e) => e.id));
+    const dates = res.body.items.map((e: { joiningDate: string }) => e.joiningDate);
+    expect([...dates].sort().reverse()).toEqual(dates);
+  });
+
+  it('discloses only name, department, designation and joining date', async () => {
+    const res = await recent(await loginAs('employee1'));
+    for (const item of res.body.items) {
+      expect(Object.keys(item).sort()).toEqual(['department', 'designation', 'firstName', 'id', 'joiningDate', 'lastName']);
+    }
+    expect(JSON.stringify(res.body)).not.toMatch(/@company\.com|phone|managerId|role|status|password/i);
+  });
+
+  it('an EMPLOYEE sees people the register still hides from them', async () => {
+    // The list is company-wide; the register for employee1 is still just employee1.
+    const token = await loginAs('employee1');
+    const joiners = await recent(token, '?limit=20');
+    const others = joiners.body.items.filter((e: { id: string }) => e.id !== SEED.employee1.employeeId);
+    expect(others.length).toBeGreaterThan(0);
+    const register = await request(app).get('/api/employees?limit=100').set(bearer(token));
+    expect(register.body.items.map((e: { id: string }) => e.id)).toEqual([SEED.employee1.employeeId]);
+    const lookup = await request(app).get(`/api/employees/${others[0].id}`).set(bearer(token));
+    expect(lookup.status).toBe(403);
+  });
+
+  it('validates limit: 0, 21 and a non-number → 400; unknown key → 400', async () => {
+    const token = await loginAs('admin');
+    for (const query of ['?limit=0', '?limit=21', '?limit=five', '?page=1']) {
+      const res = await recent(token, query);
+      expect(res.status).toBe(400);
+    }
+  });
+});

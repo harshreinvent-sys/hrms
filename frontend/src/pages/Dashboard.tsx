@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { fetchDashboardStats } from '../api/dashboard';
+import { fetchDashboardStats, fetchRecentJoiners } from '../api/dashboard';
 import { listEmployees } from '../api/employees';
 import { toApiError } from '../api/client';
 import { useAuth } from '../auth/useAuth';
@@ -21,7 +21,9 @@ const scopeCopy = {
   EMPLOYEE: { eyebrow: 'Your record', note: 'Figures cover your own record only.' },
 } as const;
 
-function PersonRow({ e, right }: { e: Employee; right?: React.ReactNode }) {
+type Person = Pick<Employee, 'id' | 'firstName' | 'lastName' | 'department' | 'designation'>;
+
+function PersonRow({ e, right }: { e: Person; right?: React.ReactNode }) {
   return (
     <li className="flex items-center gap-3 py-2.5">
       <Monogram firstName={e.firstName} lastName={e.lastName} department={e.department} size="md" />
@@ -41,13 +43,10 @@ export function DashboardPage() {
   const canOpenRegister = role !== 'EMPLOYEE';
 
   const stats = useQuery({ queryKey: ['dashboard'], queryFn: fetchDashboardStats });
-  // One scoped list feeds both the "recent joiners" and "reporting lines" panels.
+  // The scoped list feeds the "reporting lines" and "inactive" panels.
   const people = useQuery({ queryKey: ['employees', { limit: 100, forDashboard: true }], queryFn: () => listEmployees({ limit: 100 }) });
-
-  const recent = useMemo(
-    () => [...(people.data?.items ?? [])].sort((a, b) => b.joiningDate.localeCompare(a.joiningDate)).slice(0, 5),
-    [people.data],
-  );
+  // Recent joiners come from their own company-wide endpoint, identical for every role (D-022).
+  const recent = useQuery({ queryKey: ['dashboard', 'recent-joiners'], queryFn: () => fetchRecentJoiners(5) });
 
   const reportingLines = useMemo(() => {
     const items = people.data?.items ?? [];
@@ -142,15 +141,15 @@ export function DashboardPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <Panel eyebrow="People" title="Recent joiners" padded={false}>
-            {people.isError && <div className="p-4"><ErrorBanner error={toApiError(people.error)} /></div>}
-            {people.isPending ? (
+          <Panel eyebrow="Company" title="Recent joiners" padded={false}>
+            {recent.isError && <div className="p-4"><ErrorBanner error={toApiError(recent.error)} /></div>}
+            {recent.isPending ? (
               <ul className="divide-y divide-rule px-4">{[0, 1, 2].map((i) => <li key={i} className="flex items-center gap-3 py-2.5"><Skeleton className="h-9 w-9" /><Skeleton className="h-3.5 w-40" /></li>)}</ul>
-            ) : recent.length === 0 ? (
+            ) : !recent.data || recent.data.length === 0 ? (
               <div className="p-4"><EmptyState title="Nobody to show" /></div>
             ) : (
               <ul className="divide-y divide-rule px-4">
-                {recent.map((e) => (
+                {recent.data.map((e) => (
                   <PersonRow key={e.id} e={e} right={<span className="num shrink-0 text-[12px] text-ink-faint">{e.joiningDate}</span>} />
                 ))}
               </ul>

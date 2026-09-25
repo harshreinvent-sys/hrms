@@ -1,4 +1,4 @@
-import { Role, type Prisma } from '@prisma/client';
+import { EmploymentStatus, Role, type Prisma } from '@prisma/client';
 
 /**
  * Every authorization decision in the API is made here and only here.
@@ -14,6 +14,8 @@ import { Role, type Prisma } from '@prisma/client';
  *   MANAGER   sees self and direct reports; updates own phone; updates a direct
  *             report's designation and department; nothing else.
  *   EMPLOYEE  sees self; updates own phone; nothing else.
+ *   everyone  sees the same company-wide "recent joiners" list, reduced to
+ *             name / department / designation / joining date (D-022).
  *
  * "Direct report" is one level: target.managerId === actor.employeeId.
  */
@@ -126,5 +128,23 @@ export function scopeWhere(actor: Actor): Prisma.EmployeeWhereInput {
       return { OR: [{ id: actor.employeeId }, { managerId: actor.employeeId }] };
     case Role.EMPLOYEE:
       return { id: actor.employeeId };
+  }
+}
+
+/**
+ * The one deliberate exception to `scopeWhere` (D-022): the dashboard's
+ * "recent joiners" panel is a company-wide welcome list that every role sees
+ * identically. It is served by its own endpoint with a reduced projection
+ * (name, department, designation, joining date — never email, phone, manager,
+ * role or status), so it widens nothing else: the register, the record lookup
+ * and the stats stay scoped. Written as a policy function so the exception is
+ * visible here, beside the rule it relaxes, and covered by the policy tests.
+ */
+export function recentJoinersWhere(actor: Actor): Prisma.EmployeeWhereInput {
+  switch (actor.role) {
+    case Role.ADMIN:
+    case Role.MANAGER:
+    case Role.EMPLOYEE:
+      return { status: EmploymentStatus.ACTIVE };
   }
 }

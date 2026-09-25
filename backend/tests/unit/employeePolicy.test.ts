@@ -9,6 +9,7 @@ import {
   canDelete,
   canView,
   discloseMissing,
+  recentJoinersWhere,
   scopeWhere,
   updatableFields,
   type Actor,
@@ -139,5 +140,19 @@ describe('scopeWhere', () => {
     // The function signature makes this structural: there is no parameter for a
     // requested id. This test exists so the property is stated, not assumed.
     expect(scopeWhere.length).toBe(1);
+  });
+});
+
+describe('recentJoinersWhere (D-022 — the one deliberate exception to scoping)', () => {
+  it('is the same company-wide ACTIVE predicate for every role', () => {
+    expect(recentJoinersWhere(admin)).toEqual({ status: 'ACTIVE' });
+    expect(recentJoinersWhere(manager)).toEqual({ status: 'ACTIVE' });
+    expect(recentJoinersWhere(employee)).toEqual({ status: 'ACTIVE' });
+  });
+
+  it('never narrows by the actor id (so all roles see identical rows)', () => {
+    for (const actor of [admin, manager, employee]) {
+      expect(JSON.stringify(recentJoinersWhere(actor))).not.toContain(actor.employeeId);
+    }
   });
 });

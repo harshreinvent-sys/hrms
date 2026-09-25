@@ -173,6 +173,26 @@ components:
         role: { $ref: '#/components/schemas/Role' }
         status: { $ref: '#/components/schemas/EmploymentStatus' }
 
+    RecentJoiner:
+      type: object
+      description: Reduced projection (D-022) — never email, phone, manager, role or status.
+      required: [id, firstName, lastName, department, designation, joiningDate]
+      properties:
+        id: { type: string, example: EMP015 }
+        firstName: { type: string, example: Lakshmi }
+        lastName: { type: string, example: Pillai }
+        department: { $ref: '#/components/schemas/Department' }
+        designation: { $ref: '#/components/schemas/Designation' }
+        joiningDate: { type: string, format: date, example: '2024-02-05' }
+
+    RecentJoinersResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RecentJoiner' }
+
     DashboardStats:
       type: object
       required: [total, active, inactive, byDepartment]
@@ -302,6 +322,32 @@ paths:
       responses:
         '204': { description: Logged out. }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /dashboard/recent-joiners:
+    get:
+      tags: [Dashboard]
+      summary: Newest active joiners — company-wide, identical for every role
+      description: |
+        The one deliberate exception to per-role scoping (D-022): a welcome list for the
+        dashboard. Every authenticated user gets the same rows, reduced to name, department,
+        designation and joining date. The register, the record lookup and `/dashboard/stats`
+        remain scoped; this endpoint discloses nothing that would let a caller reach them.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
+      responses:
+        '200':
+          description: Newest joiners first (ties broken by id, newest first).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecentJoinersResponse' }
+        '400':
+          description: '`limit` outside 1–20, or an unknown query key.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /dashboard/stats:
     get:

@@ -1,7 +1,18 @@
 import { EmploymentStatus } from '@prisma/client';
 import { prisma } from '../../utils/prisma';
 import type { AuthenticatedUser } from '../../middleware/authenticate';
-import { scopeWhere } from '../../policies/employeePolicy';
+import { recentJoinersWhere, scopeWhere } from '../../policies/employeePolicy';
+
+/** Deliberately narrow (D-022): nothing that identifies or contacts the person beyond their name. */
+export interface RecentJoiner {
+  id: string;
+  firstName: string;
+  lastName: string;
+  department: string;
+  designation: string;
+  /** Calendar date, `YYYY-MM-DD`. */
+  joiningDate: string;
+}
 
 export interface DashboardStats {
   total: number;
@@ -36,4 +47,20 @@ export async function stats(actor: AuthenticatedUser): Promise<DashboardStats> {
     inactive: total - active,
     byDepartment: groups.map((group) => ({ department: group.department, count: group._count._all })),
   };
+}
+
+/**
+ * The newest active joiners, company-wide and identical for every role — the
+ * one place the dashboard is not scoped (D-022, `recentJoinersWhere`). The
+ * `select` is the whole disclosure: no email, phone, manager, role or status.
+ */
+export async function recentJoiners(actor: AuthenticatedUser, limit: number): Promise<RecentJoiner[]> {
+  const rows = await prisma.employee.findMany({
+    where: recentJoinersWhere(actor),
+    select: { id: true, firstName: true, lastName: true, department: true, designation: true, joiningDate: true },
+    orderBy: [{ joiningDate: 'desc' }, { id: 'desc' }],
+    take: limit,
+  });
+
+  return rows.map((row) => ({ ...row, joiningDate: row.joiningDate.toISOString().slice(0, 10) }));
 }
