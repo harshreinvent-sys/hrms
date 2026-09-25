@@ -4,8 +4,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { ToastProvider } from './components/Toast';
+import { warmUp } from './api/client';
 import { router } from './routes';
 import './index.css';
+
+// Start a sleeping free-tier server booting before the user has finished
+// reading the page. Harmless when it is already awake.
+warmUp();
 
 const queryClient = new QueryClient({
   defaultOptions: {

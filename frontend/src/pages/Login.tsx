@@ -9,6 +9,8 @@ import { Button } from '../components/Button';
 import { TextField } from '../components/FormField';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { Monogram } from '../components/Monogram';
+import { WakingNotice } from '../components/WakingNotice';
+import { useServerWaking } from '../components/useServerWaking';
 import type { ApiError } from '../types/api';
 
 const schema = z.object({
@@ -28,6 +30,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [apiError, setApiError] = useState<ApiError | null>(null);
+  const { waking, reset: resetWaking } = useServerWaking();
 
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { email: '', password: '' } });
 
@@ -38,9 +41,11 @@ export function LoginPage() {
     clearExpiredNotice();
     try {
       await login(values.email, values.password);
+      resetWaking();
       const from = (location.state as { from?: string } | null)?.from;
       navigate(from && from !== '/login' ? from : '/', { replace: true });
     } catch (error) {
+      resetWaking();
       setApiError(toApiError(error));
       form.resetField('password');
     }
@@ -111,12 +116,13 @@ export function LoginPage() {
               </div>
             )}
             <ErrorBanner error={apiError} />
+            <WakingNotice waking={waking} />
 
             <TextField label="Email" type="email" autoComplete="username" autoFocus error={form.formState.errors.email?.message} {...form.register('email')} />
             <TextField label="Password" type="password" autoComplete="current-password" error={form.formState.errors.password?.message} {...form.register('password')} />
 
             <Button type="submit" variant="primary" loading={form.formState.isSubmitting} className="mt-1 h-10">
-              Sign in
+              {form.formState.isSubmitting ? (waking ? 'Waiting for the server…' : 'Signing in…') : 'Sign in'}
             </Button>
             <p className="text-[12px] text-ink-faint">Sessions last 30 minutes and end when the tab closes.</p>
           </form>

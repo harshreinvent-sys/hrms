@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, type AxiosRequestConfig } from 'axios';
 import type { ApiError } from '../types/api';
 import { clearToken, getToken, SESSION_EXPIRED_EVENT } from '../auth/token';
 
@@ -18,9 +18,50 @@ function resolveBaseUrl(): string {
   return base;
 }
 
+const BASE_URL = resolveBaseUrl();
+
+// ---------------------------------------------------------------------------
+// Cold-start tolerance
+//
+// Free-tier hosting (Render) spins the API down after idle minutes; the first
+// request afterwards hangs for 30–60 s while it boots, or gets a 502/503 from
+// the platform's edge. Those are retried with a pause. Everything else — 4xx,
+// and any 5xx that carries our own { error: { code } } body (the API is up,
+// it just failed) — is returned at once.
+// ---------------------------------------------------------------------------
+
+/** Total attempts, including the first. */
+export const MAX_ATTEMPTS = 3;
+/** Pause before attempt 2 and attempt 3. */
+const RETRY_DELAYS_MS = [4_000, 10_000];
+/** Per-attempt timeout; a cold boot usually finishes inside this. */
+const ATTEMPT_TIMEOUT_MS = 40_000;
+
+/** Fired on window before each retry: `detail = { attempt, max, delayMs }`. */
+export const SERVER_WAKING_EVENT = 'hrms:waking';
+
+type RetryConfig = AxiosRequestConfig & { __attempt?: number };
+
+const RETRYABLE_METHODS = new Set(['get', 'head', 'options']);
+
+/** Only requests whose repetition cannot change data. Login has no side effects. */
+function isSafeToRetry(config: RetryConfig): boolean {
+  const method = (config.method ?? 'get').toLowerCase();
+  return RETRYABLE_METHODS.has(method) || /\/auth\/login$/.test(config.url ?? '');
+}
+
+function isColdStartFailure(error: AxiosError): boolean {
+  if (!error.response) return true; // network error or timeout
+  const { status, data } = error.response;
+  const apiShaped = typeof data === 'object' && data !== null && 'error' in data;
+  return [502, 503, 504].includes(status) && !apiShaped;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const api = axios.create({
-  baseURL: resolveBaseUrl(),
-  timeout: 30_000,
+  baseURL: BASE_URL,
+  timeout: ATTEMPT_TIMEOUT_MS,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -31,28 +72,57 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// A 401 from any route means the session is over: clear it and let the auth
-// layer redirect. The login route's own 401 (bad credentials) is excluded so
-// the form can show the message instead of bouncing.
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
-    const isLoginCall = error.config?.url?.endsWith('/auth/login');
+  async (error: AxiosError) => {
+    const config = (error.config ?? {}) as RetryConfig;
+
+    // A 401 from any route means the session is over: clear it and let the
+    // auth layer redirect. The login route's own 401 (bad credentials) is
+    // excluded so the form can show the message instead of bouncing.
+    const isLoginCall = /\/auth\/login$/.test(config.url ?? '');
     if (error.response?.status === 401 && !isLoginCall) {
       clearToken();
       window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+      return Promise.reject(error);
     }
+
+    const attempt = config.__attempt ?? 1;
+    if (attempt < MAX_ATTEMPTS && isSafeToRetry(config) && isColdStartFailure(error)) {
+      const delayMs = RETRY_DELAYS_MS[attempt - 1] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]!;
+      window.dispatchEvent(
+        new CustomEvent(SERVER_WAKING_EVENT, { detail: { attempt: attempt + 1, max: MAX_ATTEMPTS, delayMs } }),
+      );
+      await sleep(delayMs);
+      return api.request({ ...config, __attempt: attempt + 1 } as RetryConfig);
+    }
+
     return Promise.reject(error);
   },
 );
+
+/**
+ * Nudge a sleeping server the moment the app loads, so it is booting while the
+ * user is still reading the login page. Fire-and-forget; failures are expected
+ * and ignored. `/health` sits at the domain root, outside /api.
+ */
+export function warmUp(): void {
+  const healthUrl = BASE_URL.replace(/\/api$/i, '') + '/health';
+  void axios.get(healthUrl, { timeout: ATTEMPT_TIMEOUT_MS }).catch(() => undefined);
+}
 
 /** Normalises anything thrown by an API call into the backend's error shape. */
 export function toApiError(error: unknown): ApiError {
   if (axios.isAxiosError(error)) {
     const body = error.response?.data as { error?: ApiError } | undefined;
     if (body?.error?.message) return body.error;
-    if (error.code === 'ECONNABORTED') return { code: 'TIMEOUT', message: 'The server took too long to respond.' };
+    if (error.code === 'ECONNABORTED') {
+      return { code: 'TIMEOUT', message: `The server did not respond after ${MAX_ATTEMPTS} attempts. It may still be starting — try again in a minute.` };
+    }
     if (!error.response) return { code: 'NETWORK', message: 'Cannot reach the API. Is the backend running?' };
+    if ([502, 503, 504].includes(error.response.status)) {
+      return { code: 'UNAVAILABLE', message: `The server is unavailable after ${MAX_ATTEMPTS} attempts. Try again in a minute.` };
+    }
     return { code: 'HTTP_' + error.response.status, message: error.message };
   }
   return { code: 'UNKNOWN', message: error instanceof Error ? error.message : 'Something went wrong.' };

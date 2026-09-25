@@ -1,6 +1,6 @@
 # Decisions
 
-Format: context → decision → why → trade-off. Claude drafts; the human approves. Next id: **D-018**.
+Format: context → decision → why → trade-off. Claude drafts; the human approves. Next id: **D-019**.
 
 ## D-001 — Rebuild clean in `backend/`, drop out-of-spec modules
 **Context:** An API-only scaffold existed before the assessment brief arrived (flat `src/`, 4 roles, cuid IDs, attendance/leave/org, Vitest, inline authorization).
@@ -99,3 +99,9 @@ Format: context → decision → why → trade-off. Claude drafts; the human app
 **Decision:** `globalSetup` runs `npx prisma migrate reset --force --skip-generate --skip-seed` against the `test` schema, then the seed.
 **Why:** The sequence exists only in migration SQL, so the test database must be built from the migrations. This also means the suite verifies the migration files a reviewer will apply, rather than a parallel schema that merely resembles them.
 **Trade-off:** `migrate reset` is a few seconds slower than `db push` and, like it, trips Prisma's AI-agent consent guard when run from an agent. Same consent variable covers both.
+
+## D-018 — Frontend retries cold-start failures; never retries writes
+**Context:** The API runs on Render's free tier, which sleeps after idle minutes and takes 30–60 s to wake. The first login after that failed with a 30 s timeout. User asked for 2–3 retries.
+**Decision:** The axios client retries up to 3 attempts total (pauses 4 s, 10 s; 40 s timeout per attempt) when the failure looks like a sleeping platform: no response at all, or a 502/503/504 **without** the API's `{ error: { code } }` body. Only idempotent requests retry — GET/HEAD/OPTIONS and `POST /auth/login` (no side effects). Creates, updates and deletes never retry automatically. A `hrms:waking` event drives a visible "attempt n of 3" notice. On load the app pings `/health` (outside the retrying client) to start the boot early.
+**Why:** Distinguishing platform 5xx from the API's own 503 (which carries our JSON shape) means a genuinely failing API is reported immediately instead of after three waits. Excluding writes prevents a slow `POST /employees` from creating two employees.
+**Trade-off:** Worst case before the user sees an error is ~2 minutes (3 × 40 s + 14 s of pauses). Acceptable given the visible progress notice.

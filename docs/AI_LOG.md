@@ -345,3 +345,17 @@ Append-only. One entry per slice, newest at the bottom. Earlier entries are neve
 **Human corrections:** None.
 **Verification:** `npm run build`, `npm run lint` clean. Measurements as above on all six screens. Cleanup: `.env` restored from backup, stub stopped, frontend dev server restarted on the real API.
 **Commit:** suggested — `feat(frontend): card layout for the register below the sm breakpoint`
+
+## AI-020 — Cold-start retries for Render's free tier (2026-09-25)
+**Prompt (summary):** User: the backend on Render free sleeps and takes ~1 minute to restart — make the frontend retry login 2–3 times.
+**Generated / changed:**
+- `frontend/src/api/client.ts` — response interceptor retries cold-start failures (D-018): 3 attempts, 4 s / 10 s pauses, 40 s per-attempt timeout; only for GET/HEAD/OPTIONS and `POST /auth/login`; a 5xx carrying the API's own error body is *not* retried. Dispatches `hrms:waking` `{ attempt, max, delayMs }` before each retry. `warmUp()` pings `/health` (root, outside `/api`) via plain axios so it never retries itself. `toApiError` messages mention the attempt count after exhaustion.
+- `frontend/src/components/useServerWaking.ts`, `WakingNotice.tsx` — hook + warm-toned notice: "Waking the server — attempt n of 3. Free hosting sleeps after inactivity…".
+- `pages/Login.tsx` shows the notice and switches the button to "Waiting for the server…"; `auth/ProtectedRoute.tsx` shows it under "Checking your session" (the stored-session re-validation is the request that wakes the server on a refresh). `main.tsx` calls `warmUp()` at startup.
+- README cold-start paragraph; `docs/DECISIONS.md` D-018.
+**Issues found:**
+- First simulation run was inconclusive: the two simulated 503s were both consumed by `/health` warm-up pings (the preview tab's first load plus my navigation to `/login` = two page loads), so the login went straight through. Caught by reading the stub's request log; re-ran with three failures.
+- Design point worth stating: the retry must not apply to `POST /employees`, `PUT`, `DELETE` — a timed-out create that actually succeeded would otherwise be created twice. Enforced by `isSafeToRetry`.
+**Human corrections:** None; user specified the behaviour.
+**Verification:** `npm run build`, `npm run lint` clean. Local simulation with a throwaway "sleeping Render" stub (scratchpad, not the repo) returning 503 HTML for the first 3 requests: stub log shows `/health` 503 (warm-up), `POST /api/auth/login` 503, 503, then serving; in the browser at 1.5 s the notice read "attempt 2 of 3" with the button "Waiting for the server…", at ~6 s "attempt 3 of 3", at ~17 s the dashboard rendered. Cleanup: stub killed, `frontend/.env` restored, dev server restarted on the real API. Not verified: against the live Render service (its sleep cannot be forced on demand).
+**Commit:** suggested — `feat(frontend): retry cold-start failures with a visible "waking the server" notice`
