@@ -334,7 +334,7 @@ describe('PUT /api/employees/:id — object-level', () => {
   it('employee1 updates employee2 → 403, nothing applied', async () => {
     const before = await prisma.employee.findUniqueOrThrow({ where: { id: SEED.employee2.employeeId } });
     const res = await put(`/api/employees/${SEED.employee2.employeeId}`, employee1Token, {
-      phone: '+91-00000-00000',
+      phone: '9000000000',
     });
     expect(res.status).toBe(403);
     const after = await prisma.employee.findUniqueOrThrow({ where: { id: SEED.employee2.employeeId } });
@@ -348,14 +348,14 @@ describe('PUT /api/employees/:id — object-level', () => {
 
   it('employee1 updates a nonexistent id → 403 (not 404)', async () => {
     const res = await put(`/api/employees/${NONEXISTENT_EMPLOYEE_ID}`, employee1Token, {
-      phone: '+91-00000-00000',
+      phone: '9000000000',
     });
     expect(res.status).toBe(403);
   });
 
   it('admin updates a nonexistent id → 404', async () => {
     const res = await put(`/api/employees/${NONEXISTENT_EMPLOYEE_ID}`, adminToken, {
-      phone: '+91-00000-00000',
+      phone: '9000000000',
     });
     expect(res.status).toBe(404);
   });
@@ -391,7 +391,7 @@ describe('PUT /api/employees/:id — field-level (mass assignment)', () => {
   it('employee1 mixing an allowed and a forbidden field → 403; the allowed one is NOT applied either', async () => {
     const before = await prisma.employee.findUniqueOrThrow({ where: { id: SEED.employee1.employeeId } });
     const res = await put(`/api/employees/${SEED.employee1.employeeId}`, employee1Token, {
-      phone: '+91-99999-99999',
+      phone: '9999999999',
       role: 'ADMIN',
     });
     expect(res.status).toBe(403);
@@ -404,10 +404,10 @@ describe('PUT /api/employees/:id — field-level (mass assignment)', () => {
     const original = (await prisma.employee.findUniqueOrThrow({ where: { id: SEED.employee1.employeeId } })).phone;
     try {
       const res = await put(`/api/employees/${SEED.employee1.employeeId}`, employee1Token, {
-        phone: '+91-98450-11111',
+        phone: '9845011111',
       });
       expect(res.status).toBe(200);
-      expect(res.body.employee.phone).toBe('+91-98450-11111');
+      expect(res.body.employee.phone).toBe('9845011111');
     } finally {
       await prisma.employee.update({ where: { id: SEED.employee1.employeeId }, data: { phone: original } });
     }
@@ -432,7 +432,7 @@ describe('PUT /api/employees/:id — field-level (mass assignment)', () => {
 
   it('manager updates a direct report phone → 403', async () => {
     const res = await put(`/api/employees/${SEED.employee1.employeeId}`, managerToken, {
-      phone: '+91-00000-00000',
+      phone: '9000000000',
     });
     expect(res.status).toBe(403);
     expect(res.body.error.details).toEqual([{ path: 'phone', message: expect.any(String) }]);
@@ -447,7 +447,7 @@ describe('PUT /api/employees/:id — field-level (mass assignment)', () => {
     const original = (await prisma.employee.findUniqueOrThrow({ where: { id: SEED.manager.employeeId } })).phone;
     try {
       const res = await put(`/api/employees/${SEED.manager.employeeId}`, managerToken, {
-        phone: '+91-98450-22222',
+        phone: '9845022222',
       });
       expect(res.status).toBe(200);
     } finally {
@@ -466,7 +466,7 @@ describe('PUT /api/employees/:id — field-level (mass assignment)', () => {
       const res = await put(`/api/employees/${SEED.employee3.employeeId}`, adminToken, {
         designation: 'Senior Financial Analyst',
         department: 'Finance',
-        phone: '+91-98450-33333',
+        phone: '9845033333',
       });
       expect(res.status).toBe(200);
       expect(res.body.employee.designation).toBe('Senior Financial Analyst');

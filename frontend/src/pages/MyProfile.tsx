@@ -8,7 +8,7 @@ import { updateEmployee } from '../api/employees';
 import { toApiError } from '../api/client';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { Button } from '../components/Button';
-import { TextField } from '../components/FormField';
+import { PhoneField } from '../components/FormField';
 import { RoleBadge, StatusBadge } from '../components/Badge';
 import { Panel } from '../components/Panel';
 import { KeyValue, KeyValueList } from '../components/KeyValue';
@@ -18,7 +18,7 @@ import { useToast } from '../components/useToast';
 import type { ApiError, Employee } from '../types/api';
 
 const phoneSchema = z.object({
-  phone: z.string().trim().min(6, 'At least 6 characters').max(20, 'At most 20 characters').or(z.literal('')),
+  phone: z.string().trim().regex(/^\d{10}$/, 'Enter exactly 10 digits').or(z.literal('')),
 });
 type PhoneForm = z.infer<typeof phoneSchema>;
 
@@ -98,7 +98,7 @@ function PhoneEditor({ employee, onSaved }: { employee: Employee; onSaved: (e: E
       <p className="text-[13px] text-ink-muted">The one field you can change yourself. Everything else is maintained by HR — and the server enforces that, not this page.</p>
       <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} noValidate className="mt-4 flex flex-col gap-4">
         <ErrorBanner error={apiError} />
-        <TextField label="Phone" mono placeholder="+91-98450-00000" error={form.formState.errors.phone?.message} {...form.register('phone')} />
+        <PhoneField label="Phone" hint="10 digits, no country code" error={form.formState.errors.phone?.message} {...form.register('phone')} />
         <div className="flex justify-end">
           <Button type="submit" variant="primary" loading={mutation.isPending} disabled={!form.formState.isDirty}>Save</Button>
         </div>

@@ -1,4 +1,5 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import { normalizePhoneInput } from '../lib/phone';
 
 interface FieldFrameProps {
   label: string;
@@ -46,6 +47,35 @@ export const TextField = forwardRef<
         {...rest}
       />
     </FieldFrame>
+  );
+});
+
+/**
+ * Ten-digit phone input. Non-digits are dropped as they are typed or pasted and
+ * input stops at ten digits; the numeric keyboard is requested on phones. The
+ * Zod rule and the API enforce the same shape. Deliberately no native
+ * `maxLength`: the browser applies that to the raw text *before* this handler
+ * runs, so a pasted "+91 98450 00001" would keep the "+91 " and lose digits.
+ */
+export const PhoneField = forwardRef<
+  HTMLInputElement,
+  Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'inputMode' | 'maxLength'> & { label: string; error?: string; hint?: string }
+>(function PhoneField({ onInput, ...rest }, ref) {
+  return (
+    <TextField
+      ref={ref}
+      type="tel"
+      inputMode="numeric"
+      mono
+      placeholder="9845000000"
+      onInput={(event) => {
+        const input = event.currentTarget;
+        const digits = normalizePhoneInput(input.value);
+        if (input.value !== digits) input.value = digits;
+        onInput?.(event);
+      }}
+      {...rest}
+    />
   );
 });
 

@@ -30,7 +30,8 @@ const dateOnly = z
 
 const name = z.string().trim().min(1).max(80);
 const label = z.string().trim().min(1).max(100);
-const phone = z.string().trim().min(6).max(20);
+/** Exactly ten digits — no country code, spaces or dashes. Stored as typed. */
+const phone = z.string().trim().regex(/^\d{10}$/, 'Phone must be exactly 10 digits');
 
 /**
  * ADMIN creates the employee and their login together. The id is never accepted

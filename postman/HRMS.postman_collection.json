@@ -150,7 +150,7 @@
             "method": "PUT",
             "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }, { "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/employees/EMP002",
-            "body": { "mode": "raw", "raw": "{ \"phone\": \"+91-00000-00000\" }" }
+            "body": { "mode": "raw", "raw": "{ \"phone\": \"9000000000\" }" }
           }
         },
         {
@@ -173,7 +173,7 @@
             "method": "PUT",
             "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }, { "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/employees/EMP001",
-            "body": { "mode": "raw", "raw": "{ \"phone\": \"+91-98450-00001\" }" }
+            "body": { "mode": "raw", "raw": "{ \"phone\": \"9845000001\" }" }
           }
         },
         {

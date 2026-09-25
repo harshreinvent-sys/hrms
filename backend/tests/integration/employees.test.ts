@@ -59,6 +59,11 @@ describe('POST /api/employees — validation', () => {
     ['malformed joiningDate', { joiningDate: '15/01/2026' }],
     ['impossible joiningDate', { joiningDate: '2026-02-30' }],
     ['short password', { password: 'short' }],
+    ['phone with country code', { phone: '+919845000001' }],
+    ['phone with dashes', { phone: '98450-00001' }],
+    ['phone with letters', { phone: '98450abc01' }],
+    ['phone shorter than 10 digits', { phone: '984500000' }],
+    ['phone longer than 10 digits', { phone: '98450000012' }],
     ['bad role', { role: 'SUPERUSER' }],
     ['bad status', { status: 'FIRED' }],
     ['bad managerId format', { managerId: '10' }],
@@ -148,7 +153,7 @@ describe('PUT /api/employees/:id — validation', () => {
   });
 
   it('rejects a malformed id → 400', async () => {
-    const res = await put('EMP-1', { phone: '+91-98450-00000' });
+    const res = await put('EMP-1', { phone: '9845000000' });
     expect(res.status).toBe(400);
   });
 
@@ -207,7 +212,7 @@ describe('PUT /api/employees/:id — behaviour', () => {
   });
 
   it('clears the phone with phone: null', async () => {
-    const { id } = await createOne({ phone: '+91-98450-00000' });
+    const { id } = await createOne({ phone: '9845000000' });
     const res = await put(id, { phone: null });
     expect(res.status).toBe(200);
     expect(res.body.employee.phone).toBeNull();

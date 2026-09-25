@@ -164,6 +164,8 @@ All under `/api`; all require `Authorization: Bearer <token>` except login and d
 
 Error body everywhere: `{ "error": { "code", "message", "details"? } }`.
 
+`phone` is exactly ten digits (`^[0-9]{10}$`, no country code, spaces or dashes) or `null`; anything else is a 400. The forms strip non-digits as you type or paste and drop a pasted `+91` / leading `0`.
+
 ## Authorization test scenarios
 
 The six mandatory scenarios from the brief, with the extra rules the implementation enforces. Every row is an automated test in [`backend/tests/integration/authorization.test.ts`](backend/tests/integration/authorization.test.ts) (the mandatory ones are tagged `[Spec Test n]`) and a request in the Postman collection.

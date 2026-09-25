@@ -88,11 +88,14 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] `README.md` in the brief's section order; every command and path checked against the repo
   - [x] Final gate: backend typecheck + lint + **`npm test` 162/162**; frontend build + lint clean
 
+- [x] **Phone validation** (AI-022, D-020): exactly ten digits on `POST`/`PUT` (Zod + OpenAPI), `PhoneField` strips non-digits and pasted `+91`/`0` prefixes, seed/tests/Postman on ten-digit values — verified in browser on `/me` and `/employees/new`
+
 ## Next
 
 **All nine slices are complete.** Remaining items are the user's:
 1. Run `postman/HRMS.postman_collection.json` against the running API (folders 0 → 1 → 2).
-2. Push to `origin` (`git push -u origin main`) when ready — nothing has been pushed.
+2. Update `backend/.env` and `backend/.env.test` with the current Supabase password, then run `npm test` (integration suites, incl. the five new phone 400 cases) — not run since the password changed.
+3. After the Render redeploy, re-seed or re-enter any phone stored in the old `+91-…` format (D-020).
 
 Optional follow-ups, none required by the brief: code-split the frontend bundle; host the API near the database to remove the 2–7 s latency; refresh tokens.
 

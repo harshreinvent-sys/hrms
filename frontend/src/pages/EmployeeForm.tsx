@@ -13,12 +13,12 @@ import { useToast } from '../components/useToast';
 import { Button } from '../components/Button';
 import { Spinner } from '../components/Spinner';
 import { ErrorBanner } from '../components/ErrorBanner';
-import { SelectField, TextField } from '../components/FormField';
+import { PhoneField, SelectField, TextField } from '../components/FormField';
 import { editableFieldsFor, type EditableField } from '../lib/permissions';
 import type { ApiError, CreateEmployeeInput, Employee, UpdateEmployeeInput } from '../types/api';
 
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
-const optionalPhone = z.string().trim().min(6, 'At least 6 characters').max(20).or(z.literal(''));
+const optionalPhone = z.string().trim().regex(/^\d{10}$/, 'Enter exactly 10 digits').or(z.literal(''));
 
 const baseSchema = z.object({
   firstName: z.string().trim().min(1, 'Required').max(80),
@@ -177,7 +177,7 @@ function EmployeeFormInner({ employee }: { employee?: Employee }) {
           <TextField label="First name" disabled={!can('firstName')} hint={!can('firstName') ? disabledNote : undefined} error={errors.firstName?.message} {...form.register('firstName')} />
           <TextField label="Last name" disabled={!can('lastName')} hint={!can('lastName') ? disabledNote : undefined} error={errors.lastName?.message} {...form.register('lastName')} />
           <TextField label="Email" type="email" disabled={!can('email')} hint={!can('email') ? disabledNote : isCreate ? 'Also the login email' : 'Changing this changes the login'} error={errors.email?.message} {...form.register('email')} />
-          <TextField label="Phone" mono disabled={!can('phone')} hint={!can('phone') ? disabledNote : 'Optional'} error={errors.phone?.message} {...form.register('phone')} />
+          <PhoneField label="Phone" disabled={!can('phone')} hint={!can('phone') ? disabledNote : 'Optional · 10 digits, no country code'} error={errors.phone?.message} {...form.register('phone')} />
           </fieldset>
         </Panel>
 
