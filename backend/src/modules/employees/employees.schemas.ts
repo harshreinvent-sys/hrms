@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { EmploymentStatus, Role } from '@prisma/client';
+import { DEPARTMENTS, DESIGNATIONS, requiresManager } from './employees.catalog';
 
 /** Public employee id, e.g. EMP001. Anything else is a 400 before any lookup. */
 export const employeeIdSchema = z.string().regex(/^EMP\d{3,}$/, 'Employee id must look like EMP001');
@@ -28,10 +29,15 @@ const dateOnly = z
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
   }, 'Not a real calendar date');
 
-const name = z.string().trim().min(1).max(80);
-const label = z.string().trim().min(1).max(100);
+/** Letters only; single spaces, hyphens or apostrophes may join parts ("Anne-Marie", "O'Brien"). */
+export const NAME_PATTERN = /^[A-Za-z]+(?:[ '-][A-Za-z]+)*$/;
+const name = z.string().trim().min(1).max(80).regex(NAME_PATTERN, 'Letters only');
+const department = z.enum(DEPARTMENTS, { errorMap: () => ({ message: `Must be one of: ${DEPARTMENTS.join(', ')}` }) });
+const designation = z.enum(DESIGNATIONS, { errorMap: () => ({ message: `Must be one of: ${DESIGNATIONS.join(', ')}` }) });
 /** Exactly ten digits — no country code, spaces or dashes. Stored as typed. */
 const phone = z.string().trim().regex(/^\d{10}$/, 'Phone must be exactly 10 digits');
+
+export const MANAGER_REQUIRED_MESSAGE = 'A manager is required for every role except ADMIN';
 
 /**
  * ADMIN creates the employee and their login together. The id is never accepted
@@ -44,15 +50,21 @@ export const createEmployeeSchema = z
     lastName: name,
     email: z.string().trim().toLowerCase().email(),
     phone: phone.nullable().optional(),
-    department: label,
-    designation: label,
+    department,
+    designation,
     joiningDate: dateOnly,
     managerId: employeeIdSchema.nullable().optional(),
     role: z.nativeEnum(Role).default('EMPLOYEE'),
     status: z.nativeEnum(EmploymentStatus).default('ACTIVE'),
     password: z.string().min(10, 'Password must be at least 10 characters').max(200),
   })
-  .strict();
+  .strict()
+  // Org-structure rule (D-021): only an ADMIN may have no manager. For updates
+  // the same rule lives in the service, where the current row is known.
+  .refine((value) => !requiresManager(value.role) || !!value.managerId, {
+    path: ['managerId'],
+    message: MANAGER_REQUIRED_MESSAGE,
+  });
 
 /**
  * Partial by design (D-007): the caller sends only what changes. `.strict()`
@@ -65,8 +77,8 @@ export const updateEmployeeSchema = z
     lastName: name.optional(),
     email: z.string().trim().toLowerCase().email().optional(),
     phone: phone.nullable().optional(),
-    department: label.optional(),
-    designation: label.optional(),
+    department: department.optional(),
+    designation: designation.optional(),
     joiningDate: dateOnly.optional(),
     managerId: employeeIdSchema.nullable().optional(),
     role: z.nativeEnum(Role).optional(),

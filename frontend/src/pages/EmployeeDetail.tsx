@@ -14,7 +14,7 @@ import { Breadcrumb } from '../components/Breadcrumb';
 import { Skeleton } from '../components/Skeleton';
 import { RoleBadge, StatusBadge } from '../components/Badge';
 import { useToast } from '../components/useToast';
-import { editableFieldsFor } from '../lib/permissions';
+import { fieldLabel, editableFieldsFor } from '../lib/permissions';
 import type { ApiError } from '../types/api';
 
 export function EmployeeDetailPage() {
@@ -119,7 +119,9 @@ export function EmployeeDetailPage() {
               <KeyValue label="Status"><StatusBadge status={e.status} /></KeyValue>
               <KeyValue label="Login">{e.status === 'ACTIVE' ? 'Enabled' : <span className="text-clay">Disabled</span>}</KeyValue>
             </KeyValueList>
-            {canEdit && <p className="mt-3 text-[12px] text-ink-faint">You may edit: {[...editable].join(', ')}. Anything else is rejected by the API with a 403.</p>}
+            {canEdit && user?.role !== 'ADMIN' && (
+              <p className="mt-3 text-[12px] text-ink-faint">You may edit: {[...editable].map(fieldLabel).join(', ')}. Anything else is rejected by the API.</p>
+            )}
           </Panel>
         </div>
 

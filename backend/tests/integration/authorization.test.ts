@@ -263,7 +263,7 @@ describe('GET /api/me', () => {
 
 const validCreateBody = (suffix: string) => ({
   firstName: 'Test',
-  lastName: `User${suffix}`,
+  lastName: 'User',
   email: `authz.${suffix}.${Date.now()}@company.com`,
   department: 'Engineering',
   designation: 'QA Engineer',
@@ -342,7 +342,7 @@ describe('PUT /api/employees/:id — object-level', () => {
   });
 
   it('manager updates employee3 (outside team) → 403', async () => {
-    const res = await put(`/api/employees/${SEED.employee3.employeeId}`, managerToken, { designation: 'X' });
+    const res = await put(`/api/employees/${SEED.employee3.employeeId}`, managerToken, { designation: 'Software Engineer' });
     expect(res.status).toBe(403);
   });
 
@@ -456,7 +456,7 @@ describe('PUT /api/employees/:id — field-level (mass assignment)', () => {
   });
 
   it('manager updates own designation → 403 (self is phone-only)', async () => {
-    const res = await put(`/api/employees/${SEED.manager.employeeId}`, managerToken, { designation: 'CTO' });
+    const res = await put(`/api/employees/${SEED.manager.employeeId}`, managerToken, { designation: 'Engineering Manager' });
     expect(res.status).toBe(403);
   });
 

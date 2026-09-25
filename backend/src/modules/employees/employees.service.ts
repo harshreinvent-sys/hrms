@@ -13,7 +13,8 @@ import {
   type UpdatableField,
 } from '../../policies/employeePolicy';
 import { employeeSelect, toEmployeeDto, type EmployeeDto, type EmployeeRow } from './employees.dto';
-import type { CreateEmployeeInput, ListQuery, UpdateEmployeeInput } from './employees.schemas';
+import { MANAGER_REQUIRED_MESSAGE, type CreateEmployeeInput, type ListQuery, type UpdateEmployeeInput } from './employees.schemas';
+import { requiresManager } from './employees.catalog';
 
 export interface EmployeeListResult {
   items: EmployeeDto[];
@@ -233,6 +234,15 @@ export async function update(
   }
 
   if (input.managerId) await assertValidManager(id, input.managerId);
+
+  // Org-structure rule (D-021): after this update, does the row still have a
+  // manager if its role needs one? Checks the *effective* values — clearing the
+  // manager of an EMPLOYEE, or demoting a top-level ADMIN, are both rejected.
+  const effectiveRole = input.role ?? target.user?.role ?? null;
+  const effectiveManagerId = input.managerId === undefined ? target.managerId : input.managerId;
+  if (effectiveRole !== null && requiresManager(effectiveRole) && effectiveManagerId === null) {
+    throw new BadRequestError(MANAGER_REQUIRED_MESSAGE, [{ path: 'managerId', message: MANAGER_REQUIRED_MESSAGE }]);
+  }
 
   // Build the write explicitly, field by field, from what the policy allowed.
   const employeeData: Prisma.EmployeeUpdateInput = {};

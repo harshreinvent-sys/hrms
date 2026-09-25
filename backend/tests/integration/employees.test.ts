@@ -25,11 +25,14 @@ const body = (overrides: Record<string, unknown> = {}) => {
   counter += 1;
   return {
     firstName: 'Emp',
-    lastName: `Test${counter}`,
+    lastName: 'Test',
     email: `emp.test.${counter}.${Date.now()}@company.com`,
     department: 'Engineering',
-    designation: 'Engineer',
+    designation: 'Software Engineer',
     joiningDate: '2026-01-15',
+    // EMP011 (Sales manager, non-login) rather than EMP010: authorization.test.ts
+    // asserts EMP010's team is exactly {EMP001, EMP002}, and file order is not fixed.
+    managerId: 'EMP011',
     password: 'Welcome@12345',
     ...overrides,
   };
@@ -59,6 +62,13 @@ describe('POST /api/employees — validation', () => {
     ['malformed joiningDate', { joiningDate: '15/01/2026' }],
     ['impossible joiningDate', { joiningDate: '2026-02-30' }],
     ['short password', { password: 'short' }],
+    ['firstName with digits', { firstName: 'Neha2' }],
+    ['lastName with symbols', { lastName: 'Kulkarni_' }],
+    ['department outside the catalog', { department: 'Ops' }],
+    ['designation outside the catalog', { designation: 'Intern' }],
+    ['EMPLOYEE without a manager', { managerId: undefined }],
+    ['EMPLOYEE with managerId null', { managerId: null }],
+    ['MANAGER without a manager', { role: 'MANAGER', managerId: null }],
     ['phone with country code', { phone: '+919845000001' }],
     ['phone with dashes', { phone: '98450-00001' }],
     ['phone with letters', { phone: '98450abc01' }],
@@ -111,9 +121,25 @@ describe('POST /api/employees — behaviour', () => {
     expect(nb).toBeGreaterThan(na);
   });
 
-  it('applies defaults: role EMPLOYEE, status ACTIVE, no manager, no phone', async () => {
+  it('applies defaults: role EMPLOYEE, status ACTIVE, no phone', async () => {
     const { employee } = await createOne();
-    expect(employee).toMatchObject({ role: 'EMPLOYEE', status: 'ACTIVE', managerId: null, manager: null, phone: null });
+    expect(employee).toMatchObject({ role: 'EMPLOYEE', status: 'ACTIVE', managerId: 'EMP011', phone: null });
+  });
+
+  it('an ADMIN may be created without a manager (top of the tree)', async () => {
+    const { employee } = await createOne({ role: 'ADMIN', managerId: null });
+    expect(employee).toMatchObject({ role: 'ADMIN', managerId: null, manager: null });
+  });
+
+  it('a missing manager names the field in details', async () => {
+    const res = await post(body({ managerId: undefined }));
+    expect(res.status).toBe(400);
+    expect(res.body.error.details).toEqual([{ path: 'managerId', message: expect.stringMatching(/manager is required/i) }]);
+  });
+
+  it('accepts hyphenated and apostrophe names', async () => {
+    const { employee } = await createOne({ firstName: 'Anne-Marie', lastName: "O'Brien" });
+    expect(employee).toMatchObject({ firstName: 'Anne-Marie', lastName: "O'Brien" });
   });
 
   it('creates the User in the same transaction with the right role and isActive', async () => {
@@ -127,8 +153,6 @@ describe('POST /api/employees — behaviour', () => {
   });
 
   it('returns the manager summary when managerId is given', async () => {
-    // EMP011 (Sales manager, non-login) rather than EMP010: authorization.test.ts
-    // asserts EMP010's team is exactly {EMP001, EMP002}, and file order is not fixed.
     const { employee } = await createOne({ managerId: 'EMP011' });
     expect(employee.manager).toEqual({ id: 'EMP011', name: expect.stringContaining('Kavya') });
   });
@@ -203,12 +227,32 @@ describe('PUT /api/employees/:id — behaviour', () => {
     expect(res.body.employee.department).toBe(employee.department);
   });
 
-  it('clears the manager with managerId: null', async () => {
-    const { id } = await createOne({ managerId: SEED.manager.employeeId });
+  it('refuses to clear the manager of an EMPLOYEE → 400', async () => {
+    const { id } = await createOne();
+    const res = await put(id, { managerId: null });
+    expect(res.status).toBe(400);
+    expect(res.body.error.details[0].path).toBe('managerId');
+  });
+
+  it('refuses to demote a top-level ADMIN without giving them a manager → 400', async () => {
+    const { id } = await createOne({ role: 'ADMIN', managerId: null });
+    const res = await put(id, { role: 'EMPLOYEE' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.details[0].path).toBe('managerId');
+  });
+
+  it('clears the manager of an ADMIN with managerId: null → 200', async () => {
+    const { id } = await createOne({ role: 'ADMIN' });
     const res = await put(id, { managerId: null });
     expect(res.status).toBe(200);
     expect(res.body.employee.managerId).toBeNull();
     expect(res.body.employee.manager).toBeNull();
+  });
+
+  it('rejects a designation outside the catalog on update → 400', async () => {
+    const { id } = await createOne();
+    const res = await put(id, { designation: 'Intern' });
+    expect(res.status).toBe(400);
   });
 
   it('clears the phone with phone: null', async () => {
@@ -267,9 +311,9 @@ describe('PUT /api/employees/:id — behaviour', () => {
 
 describe('GET /api/employees — created rows appear in filters', () => {
   it('a created INACTIVE employee shows up under status=INACTIVE and not under ACTIVE', async () => {
-    const { id } = await createOne({ status: 'INACTIVE', department: 'Ops' });
-    const inactive = await get('/api/employees?status=INACTIVE&department=Ops&limit=100');
-    const active = await get('/api/employees?status=ACTIVE&department=Ops&limit=100');
+    const { id } = await createOne({ status: 'INACTIVE', department: 'Marketing' });
+    const inactive = await get('/api/employees?status=INACTIVE&department=Marketing&limit=100');
+    const active = await get('/api/employees?status=ACTIVE&department=Marketing&limit=100');
     expect(inactive.body.items.map((e: { id: string }) => e.id)).toContain(id);
     expect(active.body.items.map((e: { id: string }) => e.id)).not.toContain(id);
   });

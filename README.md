@@ -166,6 +166,12 @@ Error body everywhere: `{ "error": { "code", "message", "details"? } }`.
 
 `phone` is exactly ten digits (`^[0-9]{10}$`, no country code, spaces or dashes) or `null`; anything else is a 400. The forms strip non-digits as you type or paste and drop a pasted `+91` / leading `0`.
 
+Other request rules, all enforced by the API (the forms only mirror them):
+
+- `firstName` / `lastName`: letters only, with single spaces, hyphens or apostrophes between parts.
+- `department` and `designation`: closed lists (`backend/src/modules/employees/employees.catalog.ts`, mirrored in `frontend/src/lib/catalog.ts`); the forms show dropdowns. Adding a value is a change to both files.
+- `managerId`: required for every role except `ADMIN`. Creating an EMPLOYEE or MANAGER without one, clearing it later, or demoting a top-level ADMIN without assigning one → 400 naming `managerId`.
+
 ## Authorization test scenarios
 
 The six mandatory scenarios from the brief, with the extra rules the implementation enforces. Every row is an automated test in [`backend/tests/integration/authorization.test.ts`](backend/tests/integration/authorization.test.ts) (the mandatory ones are tagged `[Spec Test n]`) and a request in the Postman collection.

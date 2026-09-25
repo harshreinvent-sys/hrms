@@ -89,6 +89,7 @@ Plan: `~/.claude/plans/pasted-content-id-57f0-full-stack-vivid-wilkes.md` (appro
   - [x] Final gate: backend typecheck + lint + **`npm test` 162/162**; frontend build + lint clean
 
 - [x] **Phone validation** (AI-022, D-020): exactly ten digits on `POST`/`PUT` (Zod + OpenAPI), `PhoneField` strips non-digits and pasted `+91`/`0` prefixes, seed/tests/Postman on ten-digit values — verified in browser on `/me` and `/employees/new`
+- [x] **Catalog + org rules** (AI-023, D-021): department/designation dropdowns backed by a closed list on the API; manager required unless ADMIN (create refine + update effective check); letters-only names; human field labels in hints and error details, hint hidden for ADMIN; Register nav no longer active on Add employee — 38 new unit tests, 101/101
 
 ## Next
 

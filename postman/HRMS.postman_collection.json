@@ -94,7 +94,7 @@
             "method": "POST",
             "header": [{ "key": "Authorization", "value": "Bearer {{employee1Token}}" }, { "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/employees",
-            "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"Should\",\n  \"lastName\": \"Fail\",\n  \"email\": \"should.fail@company.com\",\n  \"department\": \"Engineering\",\n  \"designation\": \"Intern\",\n  \"joiningDate\": \"2026-10-01\",\n  \"password\": \"Welcome@12345\"\n}" }
+            "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"Should\",\n  \"lastName\": \"Fail\",\n  \"email\": \"should.fail@company.com\",\n  \"department\": \"Engineering\",\n  \"designation\": \"QA Engineer\",\n  \"joiningDate\": \"2026-10-01\",\n  \"managerId\": \"EMP010\",\n  \"password\": \"Welcome@12345\"\n}" }
           }
         },
         {

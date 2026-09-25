@@ -1,4 +1,5 @@
 import type { ApiError } from '../types/api';
+import { fieldLabel } from '../lib/permissions';
 
 /** Shows the API's own message, plus field details when it sent any. */
 export function ErrorBanner({ error, title }: { error: ApiError | string | null | undefined; title?: string }) {
@@ -12,7 +13,7 @@ export function ErrorBanner({ error, title }: { error: ApiError | string | null 
         <ul className="mt-1.5 list-disc pl-5 text-[13px] text-ink-muted">
           {apiError.details.map((d) => (
             <li key={`${d.path}-${d.message}`}>
-              <span className="font-mono text-ink">{d.path}</span> — {d.message}
+              <span className="font-semibold text-ink">{fieldLabel(d.path)}</span> — {d.message}
             </li>
           ))}
         </ul>

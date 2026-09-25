@@ -77,8 +77,8 @@ components:
         lastName: { type: string, example: Kulkarni }
         email: { type: string, format: email, example: employee1@company.com }
         phone: { type: string, nullable: true, pattern: '^[0-9]{10}$', description: Exactly ten digits, example: '9845000001' }
-        department: { type: string, example: Engineering }
-        designation: { type: string, example: Software Engineer }
+        department: { $ref: '#/components/schemas/Department' }
+        designation: { $ref: '#/components/schemas/Designation' }
         joiningDate: { type: string, format: date, example: '2022-01-10' }
         status: { $ref: '#/components/schemas/EmploymentStatus' }
         role:
@@ -117,20 +117,32 @@ components:
             total: { type: integer, example: 15, description: Rows visible to the caller after scoping. }
             totalPages: { type: integer, example: 1 }
 
+    Department:
+      type: string
+      description: Fixed list (D-021); anything else is a 400.
+      enum: [Engineering, Finance, HR, Marketing, Sales]
+      example: Engineering
+
+    Designation:
+      type: string
+      description: Fixed list (D-021); anything else is a 400.
+      enum: [Account Executive, Content Strategist, Designer, DevOps Engineer, Engineering Manager, Financial Analyst, HR Business Partner, Head of People, Marketing Lead, Payroll Specialist, QA Engineer, Sales Development Rep, Sales Manager, Senior Accountant, Senior Financial Analyst, Senior Software Engineer, Software Engineer, Staff Engineer]
+      example: Software Engineer
+
     CreateEmployeeRequest:
       type: object
       required: [firstName, lastName, email, department, designation, joiningDate, password]
       additionalProperties: false
       description: The id is generated server-side. Creates the employee and their login together.
       properties:
-        firstName: { type: string, maxLength: 80, example: Tara }
-        lastName: { type: string, maxLength: 80, example: Bhat }
+        firstName: { type: string, maxLength: 80, pattern: "^[A-Za-z]+(?:[ '-][A-Za-z]+)*$", description: Letters only; single spaces, hyphens or apostrophes between parts. example: Tara }
+        lastName: { type: string, maxLength: 80, pattern: "^[A-Za-z]+(?:[ '-][A-Za-z]+)*$", description: Letters only; single spaces, hyphens or apostrophes between parts. example: Bhat }
         email: { type: string, format: email, example: tara.bhat@company.com }
         phone: { type: string, nullable: true, pattern: '^[0-9]{10}$', description: Exactly ten digits, example: '9845000100' }
-        department: { type: string, maxLength: 100, example: Engineering }
-        designation: { type: string, maxLength: 100, example: QA Engineer }
+        department: { $ref: '#/components/schemas/Department' }
+        designation: { $ref: '#/components/schemas/Designation' }
         joiningDate: { type: string, format: date, example: '2026-10-01' }
-        managerId: { type: string, nullable: true, example: EMP010 }
+        managerId: { type: string, nullable: true, example: EMP010, description: Required unless `role` is ADMIN (400 otherwise). }
         role: { $ref: '#/components/schemas/Role' }
         status: { $ref: '#/components/schemas/EmploymentStatus' }
         password:
@@ -150,14 +162,14 @@ components:
         to the target (see `docs/AUTHORIZATION.md`); a disallowed key → 403 naming it,
         and nothing is applied. Changing `email` or `status` also updates the login.
       properties:
-        firstName: { type: string, maxLength: 80 }
-        lastName: { type: string, maxLength: 80 }
+        firstName: { type: string, maxLength: 80, pattern: "^[A-Za-z]+(?:[ '-][A-Za-z]+)*$", description: Letters only; single spaces, hyphens or apostrophes between parts. }
+        lastName: { type: string, maxLength: 80, pattern: "^[A-Za-z]+(?:[ '-][A-Za-z]+)*$", description: Letters only; single spaces, hyphens or apostrophes between parts. }
         email: { type: string, format: email }
         phone: { type: string, nullable: true, pattern: '^[0-9]{10}$', description: Exactly ten digits, example: '9845000001' }
-        department: { type: string, maxLength: 100 }
-        designation: { type: string, maxLength: 100, example: Senior Software Engineer }
+        department: { $ref: '#/components/schemas/Department' }
+        designation: { $ref: '#/components/schemas/Designation' }
         joiningDate: { type: string, format: date }
-        managerId: { type: string, nullable: true }
+        managerId: { type: string, nullable: true, description: '`null` is accepted only when the employee is (or becomes) an ADMIN; otherwise 400.' }
         role: { $ref: '#/components/schemas/Role' }
         status: { $ref: '#/components/schemas/EmploymentStatus' }
 
@@ -385,7 +397,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/EmployeeResponse' }
         '400':
-          description: Validation failed, or `managerId` does not exist.
+          description: Validation failed (including a non-ADMIN without `managerId`, a name that is not letters, or a department/designation outside the catalog), or `managerId` does not exist.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -463,7 +475,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/EmployeeResponse' }
         '400':
-          description: Validation failed, empty body, unknown key, or invalid `managerId` (missing, self, or would create a cycle).
+          description: Validation failed, empty body, unknown key, or invalid `managerId` (missing, self, would create a cycle, or `null` for a non-ADMIN).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

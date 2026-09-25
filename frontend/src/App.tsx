@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './auth/useAuth';
 import { fetchDashboardStats } from './api/dashboard';
@@ -16,6 +16,7 @@ import { useServerWaking } from './components/useServerWaking';
 export function AppShell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [signingOut, setSigningOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   // Any request on any page may be the one that wakes a sleeping server; the
@@ -27,6 +28,7 @@ export function AppShell() {
   if (!user) return null;
 
   const canSeeDirectory = user.role === 'ADMIN' || user.role === 'MANAGER';
+  const onAddPage = location.pathname === '/employees/new';
   const [firstName, ...rest] = user.name.split(' ');
   const lastName = rest.join(' ') || firstName;
 
@@ -50,7 +52,8 @@ export function AppShell() {
       {canSeeDirectory && (
         <>
           <p className="eyebrow px-4 pb-1.5 pt-4">People</p>
-          <NavLink to="/employees" className={linkClass} onClick={close}>
+          {/* /employees/new is its own entry below; the register must not light up for it. */}
+          <NavLink to="/employees" className={({ isActive }) => linkClass({ isActive: isActive && !onAddPage })} onClick={close}>
             <span>{user.role === 'ADMIN' ? 'Register' : 'My team'}</span>
             {stats.data && <span className="num text-[12px] text-ink-faint">{stats.data.total}</span>}
           </NavLink>
